@@ -1,0 +1,40 @@
+version: "3.8"
+
+services:
+  api-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: load-test-api-server
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - LOG_LEVEL=INFO
+    ports:
+      - "8080:8080"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    restart: unless-stopped
+    networks:
+      - load-test-network
+
+  k6:
+    image: grafana/k6:latest
+    container_name: k6-load-tester
+    volumes:
+      - ./k6-scripts:/scripts
+    environment:
+      - API_URL=http://api-server:8080
+    depends_on:
+      - api-server
+    command: ["run", "/scripts/basic-test.js"]
+    networks:
+      - load-test-network
+
+networks:
+  load-test-network:
+    driver: bridge

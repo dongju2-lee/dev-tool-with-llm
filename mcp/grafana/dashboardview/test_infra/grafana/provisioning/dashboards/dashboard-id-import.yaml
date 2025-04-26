@@ -1,0 +1,11 @@
+apiVersion: 1
+
+providers:
+  - name: 'Spring Boot ID Dashboard'
+    orgId: 1
+    folder: 'Spring Boot'
+    type: file
+    disableDeletion: false
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards/import 

@@ -1,0 +1,66 @@
+version: '3.8'
+
+services:
+  target-api:
+    build: 
+      context: ./target-api
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - DOCKER_CONTAINER=true
+    networks:
+      - monitoring-network
+
+  prometheus:
+    image: prom/prometheus:latest
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+    ports:
+      - "9090:9090"
+    networks:
+      - monitoring-network
+    depends_on:
+      - target-api
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+      - GF_INSTALL_PLUGINS=grafana-clock-panel
+      - GF_DASHBOARDS_MIN_REFRESH_INTERVAL=5s
+      # 그라파나 대시보드 ID 19004 자동 임포트
+      - GF_DASHBOARDS_DEFAULT_HOME_DASHBOARD_PATH=/etc/grafana/provisioning/dashboards/json/spring-boot-dashboard-19004.json
+      # 렌더러 설정 추가
+      - GF_RENDERING_SERVER_URL=http://renderer:8081/render
+      - GF_RENDERING_CALLBACK_URL=http://grafana:3000/
+      - GF_LOG_FILTERS=rendering:debug
+    volumes:
+      - grafana-storage:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - monitoring-network
+    depends_on:
+      - prometheus
+      - renderer
+
+  # 이미지 렌더러 서비스 추가
+  renderer:
+    image: grafana/grafana-image-renderer:latest
+    ports:
+      - "8081:8081"
+    environment:
+      - ENABLE_METRICS=true
+    networks:
+      - monitoring-network
+
+networks:
+  monitoring-network:
+    driver: bridge
+
+volumes:
+  grafana-storage: 

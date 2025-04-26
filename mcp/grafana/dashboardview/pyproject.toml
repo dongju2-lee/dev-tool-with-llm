@@ -1,0 +1,22 @@
+[project]
+name = "grafana-mcp-python"
+version = "0.1.0"
+description = "Model Context Protocol 서버 - Grafana"
+authors = [{ name = "MCP Grafana Python" }]
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi>=0.100.0",           # SSE 전송을 위함
+    "pydantic>=2.0.0",            # 데이터 검증 및 스키마 생성을 위함
+    "httpx>=0.24.0",              # 현대적인 HTTP 클라이언트
+    "python-dotenv>=1.0.0",       # 환경 변수 관리
+    "uvicorn>=0.23.0",            # ASGI 서버
+    "typer>=0.9.0",               # CLI 프레임워크
+    "rich>=13.0.0",               # 터미널 출력 형식화
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project.scripts]
+grafana-mcp = "grafana_mcp.cli:app" 

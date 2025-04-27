@@ -532,18 +532,49 @@ def render_tool_add_tab():
             
             # 설정 저장
             if save_config_to_json(current_config):
+                # 세션 상태 업데이트
                 st.session_state.mcp_config = current_config
                 
-                # MCP 도구 캐시 초기화 및 새로고침
-                clear_mcp_tools()
+                # 성공 메시지 표시
+                st.success("도구 설정이 저장되었습니다. 서버에 연결하려면 사이드바에서 'Refresh Tools' 버튼을 클릭하세요.")
+                st.toast("설정이 저장되었습니다!", icon="✅")
                 
-                # 비동기 함수 호출을 위한 플래그 설정
-                st.session_state.scheduled_mcp_refresh = True
-                st.success("Tool configuration saved. Tools will be refreshed.")
-                st.toast("Please wait while refreshing tools...", icon="🔄")
-                st.rerun()  # 화면 갱신하여 main 함수에서 실제 새로고침 처리
+                # 화면 새로고침
+                st.rerun()
             else:
-                st.error("Error saving tool configuration.")
+                st.error("도구 설정 저장 중 오류가 발생했습니다.")
+
+    # 현재 MCP 설정 표시 섹션 (항상 표시)
+    st.divider()
+    with st.expander("현재 MCP 설정 보기", expanded=True):
+        # 파일 경로 표시
+        file_path = os.path.abspath(MCP_CONFIG_FILE_PATH)
+        st.caption(f"파일: {file_path}")
+        
+        # 파일 존재 여부 확인 및 내용 표시
+        if os.path.exists(file_path):
+            try:
+                # 파일에서 직접 읽기
+                with open(file_path, "r", encoding="utf-8") as f:
+                    file_content = f.read()
+                
+                # 파일 내용이 있으면 표시
+                if file_content.strip():
+                    st.code(file_content, language="json")
+                else:
+                    st.info("설정 파일이 비어 있습니다.")
+            except Exception as e:
+                st.error(f"설정 파일 읽기 오류: {str(e)}")
+                # 오류 발생 시 세션 상태의 설정 표시
+                if st.session_state.mcp_config:
+                    st.code(json.dumps(st.session_state.mcp_config, indent=2, ensure_ascii=False), language="json")
+                    st.caption("⚠️ 파일 읽기 오류로 세션 상태의 설정을 표시합니다")
+        else:
+            st.info("설정 파일이 아직 생성되지 않았습니다. 첫 도구를 추가하면 파일이 생성됩니다.")
+            # 세션 상태에 설정이 있는 경우 표시
+            if st.session_state.mcp_config:
+                st.code(json.dumps(st.session_state.mcp_config, indent=2, ensure_ascii=False), language="json")
+                st.caption("⚠️ 세션 상태의 설정을 표시합니다 (아직 파일에 저장되지 않음)")
 
 
 async def main():

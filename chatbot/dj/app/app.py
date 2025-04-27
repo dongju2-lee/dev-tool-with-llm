@@ -17,30 +17,22 @@ MCP_CONFIG_FILE_PATH = "mcp_tools_config.json"
 def load_config_from_json():
     """
     JSON 파일에서 MCP 도구 설정을 로드합니다.
-    파일이 없으면 기본 설정으로 파일을 생성합니다.
+    파일이 없으면 빈 객체({})를 반환합니다.
 
     Returns:
         dict: 로드된 설정
     """
-    default_config = {
-        "markdown_processor": {
-            "command": "python",
-            "args": ["./mcp_server_markdown.py"],
-            "transport": "stdio"
-        }
-    }
-    
     try:
         if os.path.exists(MCP_CONFIG_FILE_PATH):
             with open(MCP_CONFIG_FILE_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
         else:
-            # 파일이 없으면 기본 설정으로 생성
-            save_config_to_json(default_config)
-            return default_config
+            # 파일이 없으면 빈 객체 반환
+            logger.info(f"MCP 설정 파일({MCP_CONFIG_FILE_PATH})이 없습니다. 빈 설정을 사용합니다.")
+            return {}
     except Exception as e:
         logger.error(f"설정 파일 로드 오류: {str(e)}")
-        return default_config
+        return {}
 
 
 def save_config_to_json(config):
@@ -88,6 +80,121 @@ def initialize():
     # MCP 도구 설정 초기화
     if "mcp_config" not in st.session_state:
         st.session_state.mcp_config = load_config_from_json()
+        
+    # MCP 도구 새로고침 예약 플래그 초기화
+    if "scheduled_mcp_refresh" not in st.session_state:
+        st.session_state.scheduled_mcp_refresh = False
+
+
+async def get_mcp_tools():
+    """
+    MCP 서버에 연결하여 사용 가능한 도구 목록을 가져옵니다.
+    서버와의 연결도 테스트합니다.
+
+    Returns:
+        tuple: (성공 여부, 도구 목록 또는 오류 메시지)
+    """
+    try:
+        from langchain_mcp_adapters.client import MultiServerMCPClient
+        
+        # MCP 설정 가져오기
+        mcp_config = st.session_state.mcp_config
+        
+        if not mcp_config:
+            return False, "MCP 설정이 없습니다."
+            
+        # MCP 클라이언트 생성
+        logger.info(f"MCP 클라이언트 생성 중... mcp_config : {mcp_config}")
+        
+        client = MultiServerMCPClient(mcp_config)
+        logger.info("MCP 클라이언트 인스턴스 생성 완료")
+        
+        # MCP 서버에 연결 시도
+        try:
+            logger.info("MCP 서버에 연결 시도 중...")
+            await client.__aenter__()
+            logger.info("MCP 서버 연결 성공")
+            
+            # 도구 가져오기 시도
+            logger.info("MCP 도구 가져오는 중...")
+            tools = client.get_tools()
+            
+            # 도구 정보 로깅
+            logger.info(f"총 {len(tools)}개의 MCP 도구를 가져왔습니다")
+            
+            # 도구 정보를 저장할 리스트
+            tools_info = []
+            
+            for i, tool in enumerate(tools, 1):
+                try:
+                    tool_name = getattr(tool, "name", f"Tool-{i}")
+                    tool_desc = getattr(tool, "description", "설명 없음")
+                    logger.info(f"  도구 {i}: {tool_name} - {tool_desc}")
+                    
+                    # 도구 정보 저장
+                    tools_info.append({
+                        "name": tool_name,
+                        "description": tool_desc
+                    })
+                except Exception as e:
+                    logger.warning(f"  도구 {i}의 정보를 가져오는 중 오류: {str(e)}")
+            
+            # 연결 닫기
+            await client.__aexit__(None, None, None)
+            
+            # 성공적으로 도구를 가져왔으면 캐시에 저장
+            st.session_state.mcp_tools_cache = {
+                "status": "ok",
+                "tools": tools_info,
+                "raw_tools": tools
+            }
+            
+            return True, tools_info
+            
+        except Exception as e:
+            error_msg = f"MCP 서버 연결 오류: {str(e)}"
+            logger.error(error_msg)
+            
+            # 오류 정보 캐시에 저장
+            st.session_state.mcp_tools_cache = {
+                "status": "error",
+                "error": error_msg
+            }
+            
+            return False, error_msg
+            
+    except ImportError:
+        error_msg = "langchain_mcp_adapters 패키지를 찾을 수 없습니다."
+        logger.warning(error_msg)
+        
+        # 오류 정보 캐시에 저장
+        st.session_state.mcp_tools_cache = {
+            "status": "error",
+            "error": error_msg
+        }
+        
+        return False, error_msg
+        
+    except Exception as e:
+        error_msg = f"MCP 도구 로드 중 오류 발생: {str(e)}"
+        logger.error(error_msg)
+        
+        # 오류 정보 캐시에 저장
+        st.session_state.mcp_tools_cache = {
+            "status": "error",
+            "error": error_msg
+        }
+        
+        return False, error_msg
+
+
+def clear_mcp_tools():
+    """
+    MCP 도구 캐시를 초기화합니다.
+    """
+    if "mcp_tools_cache" in st.session_state:
+        st.session_state.mcp_tools_cache = {}
+        logger.info("MCP 도구 캐시가 초기화되었습니다.")
 
 
 def get_chat_response(message, session_id=None):
@@ -151,30 +258,73 @@ def render_sidebar():
             
         # MCP 탭 - 도구 목록 및 새로고침 기능
         with mcp_tab:
-            if st.button("🔄 Refresh Tools", use_container_width=True, type="primary"):
-                st.session_state.mcp_config = load_config_from_json()
-                st.session_state.mcp_tools_cache = st.session_state.mcp_config
-                st.toast("Tools refreshed!", icon="🔄")
-                st.rerun()
-                
-            # 도구 목록 표시
-            tools = st.session_state.mcp_config
+            # 새로고침 버튼
+            refresh_col, clear_col = st.columns(2)
             
-            # 등록된 도구 출력 (각 항목을 클릭하면 삭제 버튼 표시)
-            for client_name, client_config in tools.items():
-                with st.expander(f"Client: {client_name}", expanded=False):
-                    st.json(client_config)
-                    if st.button(f"🗑️ 삭제", key=f"delete_{client_name}"):
-                        # 도구 삭제 처리
-                        current_config = st.session_state.mcp_config.copy()
-                        if client_name in current_config:
-                            del current_config[client_name]
-                            if save_config_to_json(current_config):
-                                st.session_state.mcp_config = current_config
-                                st.toast(f"{client_name} 도구가 삭제되었습니다.", icon="✅")
-                                st.rerun()
-                            else:
-                                st.error(f"{client_name} 도구 삭제 중 오류가 발생했습니다.")
+            with refresh_col:
+                if st.button("🔄 Refresh Tools", use_container_width=True, type="primary"):
+                    # 설정 파일에서 MCP 설정 다시 로드
+                    st.session_state.mcp_config = load_config_from_json()
+                    # MCP 도구 캐시 초기화
+                    clear_mcp_tools()
+                    
+                    # 비동기 함수 호출을 처리하기 위해 세션 상태에 작업 예약 플래그 설정
+                    st.session_state.scheduled_mcp_refresh = True
+                    st.toast("Refreshing tools... Please wait.", icon="🔄")
+                    st.rerun()
+            
+            with clear_col:
+                if st.button("🧹 Clear", use_container_width=True):
+                    clear_mcp_tools()
+                    st.toast("MCP tools cache cleared!", icon="🧹")
+                    st.rerun()
+            
+            # MCP 도구 정보 표시
+            if "mcp_tools_cache" in st.session_state and st.session_state.mcp_tools_cache:
+                cache = st.session_state.mcp_tools_cache
+                
+                if cache.get("status") == "ok":
+                    # 연결 성공 상태 표시
+                    st.success("✅ MCP Server Connection Successful")
+                    
+                    # 도구 목록 표시
+                    tools_info = cache.get("tools", [])
+                    if tools_info:
+                        st.subheader(f"Available Tools ({len(tools_info)})")
+                        for i, tool in enumerate(tools_info, 1):
+                            with st.expander(f"{i}. {tool['name']}", expanded=False):
+                                st.markdown(f"**Description**: {tool['description']}")
+                    else:
+                        st.info("No available tools found.")
+                
+                elif cache.get("status") == "error":
+                    # 연결 오류 표시
+                    st.error(f"❌ MCP Server Connection Error: {cache.get('error', 'Unknown error')}")
+            else:
+                # MCP 설정 표시 (기존 코드)
+                st.subheader("Registered MCP Configurations")
+                tools = st.session_state.mcp_config
+                
+                if not tools:
+                    st.info("No MCP configurations registered.")
+                else:
+                    # 등록된 도구 출력 (각 항목을 클릭하면 삭제 버튼 표시)
+                    for client_name, client_config in tools.items():
+                        with st.expander(f"Client: {client_name}", expanded=False):
+                            st.json(client_config)
+                            if st.button(f"🗑️ Delete", key=f"delete_{client_name}"):
+                                # 도구 삭제 처리
+                                current_config = st.session_state.mcp_config.copy()
+                                if client_name in current_config:
+                                    del current_config[client_name]
+                                    if save_config_to_json(current_config):
+                                        st.session_state.mcp_config = current_config
+                                        # MCP 도구 캐시 초기화
+                                        clear_mcp_tools()
+                                        st.toast(f"{client_name} tool deleted successfully!", icon="✅")
+                                        st.rerun()
+                                    else:
+                                        st.error(f"Error deleting tool {client_name}.")
 
 
 def display_chat_history():
@@ -328,7 +478,7 @@ def render_chat_tab():
 def render_tool_add_tab():
     """도구 추가 탭 렌더링"""    
     # 도구 JSON 입력
-    st.subheader("도구 JSON 입력")
+    st.subheader("Tool JSON Input")
     
     # 초기 도구 JSON 예시
     default_json = """{
@@ -342,12 +492,12 @@ def render_tool_add_tab():
       "--key",
       "SMITHERY_API_KEY"
     ],
-    "transport": "stdio"
+    "transport": "sse"
   }
 }"""
     
     tool_json = st.text_area(
-        "도구 구성을 위한 JSON을 입력하세요",
+        "Enter JSON configuration for the tool",
         value=default_json,
         height=300
     )
@@ -366,12 +516,12 @@ def render_tool_add_tab():
     
     # 유효성 검사 결과 표시
     if not is_valid_json and tool_json:
-        st.error(f"유효하지 않은 JSON: {json_error}")
+        st.error(f"Invalid JSON: {json_error}")
     elif tool_json:
-        st.success("유효한 JSON 형식입니다.")
+        st.success("Valid JSON format.")
     
     # 추가 버튼 및 처리
-    if st.button("추가", disabled=not is_valid_json or not tool_json):
+    if st.button("Add", disabled=not is_valid_json or not tool_json):
         if parsed_json:
             # 기존 설정 로드
             current_config = st.session_state.mcp_config.copy()
@@ -383,9 +533,17 @@ def render_tool_add_tab():
             # 설정 저장
             if save_config_to_json(current_config):
                 st.session_state.mcp_config = current_config
-                st.success("도구가 성공적으로 추가되었습니다. 사이드바의 'Refresh Tools' 버튼을 클릭하여 새로고침하세요.")
+                
+                # MCP 도구 캐시 초기화 및 새로고침
+                clear_mcp_tools()
+                
+                # 비동기 함수 호출을 위한 플래그 설정
+                st.session_state.scheduled_mcp_refresh = True
+                st.success("Tool configuration saved. Tools will be refreshed.")
+                st.toast("Please wait while refreshing tools...", icon="🔄")
+                st.rerun()  # 화면 갱신하여 main 함수에서 실제 새로고침 처리
             else:
-                st.error("도구 설정 저장 중 오류가 발생했습니다.")
+                st.error("Error saving tool configuration.")
 
 
 async def main():
@@ -395,7 +553,25 @@ async def main():
 
     initialize()
     logger.debug("Initialized application state")
-
+    
+    # 예약된 MCP 새로고침 작업 확인 및 처리
+    if "scheduled_mcp_refresh" in st.session_state and st.session_state.scheduled_mcp_refresh:
+        with st.spinner("Refreshing MCP tools..."):
+            try:
+                # MCP 도구 로드 실행
+                success, result = await get_mcp_tools()
+                
+                if success:
+                    st.toast("MCP tools refreshed successfully!", icon="✅")
+                else:
+                    st.toast(f"Failed to refresh MCP tools: {result}", icon="❌")
+            except Exception as e:
+                logger.error(f"Error refreshing MCP tools: {str(e)}")
+                st.toast(f"Error refreshing MCP tools: {str(e)}", icon="❌")
+            
+            # 플래그 초기화
+            st.session_state.scheduled_mcp_refresh = False
+    
     render_sidebar()
 
     # 탭 선택기 (숨겨진 셀렉트박스 없이 직접 탭 선택)

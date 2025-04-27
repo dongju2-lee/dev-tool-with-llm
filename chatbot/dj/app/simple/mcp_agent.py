@@ -28,8 +28,8 @@ class MCPClient:
         """클라이언트 초기화"""
         self.client = None
         self.config = {
-            "weather_service": {
-                "url": "http://0.0.0.0:8011/sse",
+            "milvus_service": {
+                "url": "http://0.0.0.0:8012/sse",
                 "transport": "sse"
             }
         }

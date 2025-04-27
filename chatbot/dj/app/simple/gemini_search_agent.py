@@ -1,7 +1,7 @@
 import os
 import asyncio
 import json
-from typing import Literal, List
+from typing import Literal, List, Dict, Any, Optional
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langgraph.graph import MessagesState
@@ -12,90 +12,14 @@ from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
 from utils.logger_config import setup_logger
 from config import *  # Import all constants and configuration values
 
-# 로거 설정'
-logger = setup_logger("gemini_search_agent", level=LOG_LEVEL)
-
-
 # 환경 변수 로드
 load_dotenv()
 
-# 싱글톤 인스턴스
-_agent_instance = None
+# 로거 설정
+logger = setup_logger("gemini_search_agent", level=LOG_LEVEL)
 
-
-async def get_gemini_search_agent_async():
-    """Gemini 검색 에이전트의 싱글톤 인스턴스를 비동기적으로 생성합니다."""
-    global _agent_instance
-    if _agent_instance is None:
-        logger.info("Gemini 검색 에이전트 초기화 시작")
-        
-        # 모델 설정 가져오기
-        model_name = os.environ.get("GEMINI_SEARCH_MODEL", "gemini-2.0-flash")
-        logger.info(f"Gemini 검색 에이전트 LLM 모델: {model_name}")
-        
-        try:
-            # LLM 초기화
-            logger.info("LLM 초기화 중...")
-            llm = ChatVertexAI(
-                model=model_name,
-                temperature=0.1,
-                max_output_tokens=8000
-            )
-            logger.info("LLM 초기화 완료")
-        
-            
-            # 에이전트 생성 (도구 없이 직접 LLM 사용)
-            logger.info("Gemini 검색 에이전트 생성 중...")
-            _agent_instance = llm
-            logger.info("Gemini 검색 에이전트 생성 완료")
-            
-            logger.info("Gemini 검색 에이전트 초기화 완료")
-        except Exception as e:
-            logger.error(f"Gemini 검색 에이전트 초기화 중 오류 발생: {str(e)}")
-            raise
-        
-    return _agent_instance
-
-
-def get_gemini_search_agent():
-    """Gemini 검색 에이전트의 싱글톤 인스턴스를 반환합니다."""
-    global _agent_instance
-    if _agent_instance is None:
-        try:
-            # 비동기 초기화 함수를 동기적으로 실행
-            logger.info("Gemini 검색 에이전트 비동기 초기화 시작")
-            loop = asyncio.get_event_loop()
-            _agent_instance = loop.run_until_complete(get_gemini_search_agent_async())
-            logger.info("Gemini 검색 에이전트 비동기 초기화 완료")
-        except Exception as e:
-            logger.error(f"Gemini 검색 에이전트 초기화 실패: {str(e)}")
-            raise
-    
-    return _agent_instance
-
-
-async def gemini_search_node(state: MessagesState) -> Command[Literal["supervisor"]]:
-    """
-    Gemini 검색 에이전트 노드 함수입니다.
-    
-    Args:
-        state: 현재 메시지와 상태 정보
-        
-    Returns:
-        슈퍼바이저로 돌아가는 명령
-    """
-    try:
-        # 에이전트 인스턴스 가져오기
-        logger.info("Gemini 검색 에이전트 노드 함수 실행 시작")
-        gemini_search_agent = get_gemini_search_agent()
-        
-        # 입력 메시지 로깅
-        if "messages" in state and state["messages"]:
-            last_user_msg = state["messages"][-1].content
-            logger.info(f"Gemini 검색 에이전트에 전달된 메시지: '{last_user_msg[:1000]}...'")
-        
-        # 시스템 프롬프트 구성
-        system_prompt = """당신은 검색 에이전트입니다. 사용자가 제공하는 질문이나 키워드에 대해 정확하고 유용한 정보를 제공해야 합니다.
+# 시스템 프롬프트
+SYSTEM_PROMPT = """당신은 검색 에이전트입니다. 사용자가 제공하는 질문이나 키워드에 대해 정확하고 유용한 정보를 제공해야 합니다.
 
 당신의 역할:
 1. 사용자의 질문을 정확히 이해하고 분석합니다.
@@ -113,35 +37,106 @@ async def gemini_search_node(state: MessagesState) -> Command[Literal["superviso
 불명확한 질문에 대해서는 추가 정보를 요청하여 더 정확한 답변을 제공할 수 있도록 하세요.
 
 응답은 항상 한국어로 제공하세요."""
+
+
+class GeminiSearchAgent:
+    """Gemini 검색 에이전트 클래스"""
+    
+    def __init__(self):
+        """에이전트 초기화"""
+        self.llm = None
         
-        # 메시지 구성
-        messages = [
-            SystemMessage(content=system_prompt)
-        ] + state["messages"]
+        # 모델 설정 가져오기
+        self.model_name = os.environ.get("GEMINI_SEARCH_MODEL", "gemini-2.0-flash")
+        logger.info(f"Gemini 검색 에이전트 LLM 모델: {self.model_name}")
+    
+    async def initialize(self):
+        """Gemini 검색 에이전트 LLM을 초기화합니다."""
+        if self.llm is None:
+            logger.info("Gemini 검색 에이전트 초기화 시작")
+            
+            try:
+                # LLM 초기화
+                logger.info("LLM 초기화 중...")
+                self.llm = ChatVertexAI(
+                    model=self.model_name,
+                    temperature=0.1,
+                    max_output_tokens=8000
+                )
+                logger.info("LLM 초기화 완료")
+                logger.info("Gemini 검색 에이전트 초기화 완료")
+            except Exception as e:
+                logger.error(f"Gemini 검색 에이전트 초기화 중 오류 발생: {str(e)}")
+                raise
         
-        # 에이전트 호출 (직접 LLM 호출)
-        logger.info("Gemini 검색 에이전트 추론 시작")
-        response = await gemini_search_agent.ainvoke(messages)
-        logger.info("Gemini 검색 에이전트 추론 완료")
+        return self.llm
+    
+    async def __call__(self, state: MessagesState) -> Command[Literal["supervisor"]]:
+        """
+        Gemini 검색 에이전트 호출 메서드입니다.
         
-        # 결과 메시지 생성
-        search_message = HumanMessage(content=response.content, name="gemini_search_agent")
-        logger.info(f"Gemini 검색 에이전트 응답: '{response.content[:300]}...'")
+        Args:
+            state: 현재 메시지와 상태 정보
+            
+        Returns:
+            슈퍼바이저로 돌아가는 명령
+        """
+        try:
+            # 에이전트 인스턴스 가져오기
+            logger.info("Gemini 검색 에이전트 호출 시작")
+            gemini_search_agent = await self.initialize()
+            
+            # 입력 메시지 로깅
+            if "messages" in state and state["messages"]:
+                last_user_msg = state["messages"][-1].content
+                logger.info(f"Gemini 검색 에이전트에 전달된 메시지: '{last_user_msg[:1000]}...'")
+            
+            # 시스템 프롬프트 구성
+            # 메시지 구성
+            messages = [
+                SystemMessage(content=SYSTEM_PROMPT)
+            ] + state["messages"]
+            
+            # 에이전트 호출 (직접 LLM 호출)
+            logger.info("Gemini 검색 에이전트 추론 시작")
+            response = await gemini_search_agent.ainvoke(messages)
+            logger.info("Gemini 검색 에이전트 추론 완료")
+            
+            # 결과 메시지 생성
+            search_message = HumanMessage(content=response.content, name="gemini_search_agent")
+            logger.info(f"Gemini 검색 에이전트 응답: '{response.content[:300]}...'")
+            
+            logger.info("Gemini 검색 에이전트 작업 완료, 슈퍼바이저로 반환")
+            
+            # 슈퍼바이저로 돌아가기
+            return Command(
+                update={"messages": [search_message]},
+                goto="supervisor"
+            )
+        except Exception as e:
+            logger.error(f"Gemini 검색 에이전트 호출 중 오류 발생: {str(e)}")
+            error_message = HumanMessage(
+                content=f"Gemini 검색 에이전트 실행 중 오류가 발생했습니다: {str(e)}",
+                name="gemini_search_agent"
+            )
+            return Command(
+                update={"messages": [error_message]},
+                goto="supervisor"
+            )
+
+
+# Gemini 검색 에이전트 인스턴스 생성
+gemini_search_agent = GeminiSearchAgent()
+
+# gemini_search_node 함수는 GeminiSearchAgent 인스턴스를 호출하는 래퍼 함수
+async def gemini_search_node(state: MessagesState) -> Command[Literal["supervisor"]]:
+    """
+    Gemini 검색 에이전트 노드 함수입니다. GeminiSearchAgent 인스턴스를 호출합니다.
+    
+    Args:
+        state: 현재 메시지와 상태 정보
         
-        logger.info("Gemini 검색 에이전트 작업 완료, 슈퍼바이저로 반환")
-        
-        # 슈퍼바이저로 돌아가기
-        return Command(
-            update={"messages": [search_message]},
-            goto="supervisor"
-        )
-    except Exception as e:
-        logger.error(f"Gemini 검색 노드 함수 실행 중 오류 발생: {str(e)}")
-        error_message = HumanMessage(
-            content=f"Gemini 검색 에이전트 실행 중 오류가 발생했습니다: {str(e)}",
-            name="gemini_search_agent"
-        )
-        return Command(
-            update={"messages": [error_message]},
-            goto="supervisor"
-        ) 
+    Returns:
+        슈퍼바이저로 돌아가는 명령
+    """
+    return await gemini_search_agent(state) 

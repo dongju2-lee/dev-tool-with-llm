@@ -23,19 +23,19 @@ MCP_CONFIG_FILE_PATH = "mcp_tools_config.json"
 
 # 로거 설정
 
-# LANGFUSE_SECRET_KEY= os.environ.get("LANGFUSE_SECRET_KEY")
-# LANGFUSE_PUBLIC_KEY= os.environ.get("LANGFUSE_PUBLIC_KEY")
-# LANGFUSE_HOST= os.environ.get("LANGFUSE_HOST")
+LANGFUSE_SECRET_KEY= os.environ.get("LANGFUSE_SECRET_KEY")
+LANGFUSE_PUBLIC_KEY= os.environ.get("LANGFUSE_PUBLIC_KEY")
+LANGFUSE_HOST= os.environ.get("LANGFUSE_HOST")
 
-# from langfuse.callback import CallbackHandler
-# langfuse_handler = CallbackHandler(
-#     public_key=LANGFUSE_PUBLIC_KEY,
-#     secret_key=LANGFUSE_SECRET_KEY,
-#     host=LANGFUSE_HOST
-# )
-# logger.info(f"langfuse셋팅 :: LANGFUSE_SECRET_KEY : {LANGFUSE_SECRET_KEY} :: LANGFUSE_PUBLIC_KEY : {LANGFUSE_PUBLIC_KEY} :: LANGFUSE_HOST : {LANGFUSE_HOST} ")
-# from langfuse.callback import CallbackHandler
-# langfuse_handler = CallbackHandler()
+from langfuse.callback import CallbackHandler
+langfuse_handler = CallbackHandler(
+    public_key=LANGFUSE_PUBLIC_KEY,
+    secret_key=LANGFUSE_SECRET_KEY,
+    host=LANGFUSE_HOST
+)
+logger.info(f"langfuse셋팅 :: LANGFUSE_SECRET_KEY : {LANGFUSE_SECRET_KEY} :: LANGFUSE_PUBLIC_KEY : {LANGFUSE_PUBLIC_KEY} :: LANGFUSE_HOST : {LANGFUSE_HOST} ")
+from langfuse.callback import CallbackHandler
+langfuse_handler = CallbackHandler()
 
 
 
@@ -275,8 +275,8 @@ async def process_query_streaming(query: str, response_placeholder, timeout_seco
                 
                 # 간단한 접근 방식: 비동기로 먼저 전체 응답을 받음
                 response = await asyncio.wait_for(
-                    # st.session_state.graph.ainvoke(inputs,config={"callbacks": [langfuse_handler]}),
-                    st.session_state.graph.ainvoke(inputs),
+                    st.session_state.graph.ainvoke(inputs,config={"callbacks": [langfuse_handler]}),
+                    # st.session_state.graph.ainvoke(inputs),
                     timeout=timeout_seconds
                 )
                 
@@ -390,8 +390,8 @@ async def process_query(query: str) -> Optional[str]:
             logger.info(f"사용자 쿼리 처리 시작: '{query[:50]}'..." if len(query) > 50 else query)
             
             inputs = {"messages": [HumanMessage(content=query)]}
-            # response = await st.session_state.graph.ainvoke(inputs,config={"callbacks": [langfuse_handler]})
-            response = await st.session_state.graph.ainvoke(inputs)
+            response = await st.session_state.graph.ainvoke(inputs,config={"callbacks": [langfuse_handler]})
+            # response = await st.session_state.graph.ainvoke(inputs)
 
 
             # 응답 처리
@@ -644,6 +644,31 @@ def chatbot_page():
     
     # 챗봇 초기화
     is_initialized = initialize_chatbot()
+    
+    # 예약된 MCP 새로고침 작업 확인 및 처리
+    if "scheduled_mcp_refresh" in st.session_state and st.session_state.scheduled_mcp_refresh:
+        with st.spinner("MCP 도구를 새로고침하는 중..."):
+            try:
+                # 비동기 함수를 동기적으로 실행
+                if "event_loop" in st.session_state:
+                    # MCP 도구 로드 실행
+                    success, result = st.session_state.event_loop.run_until_complete(get_mcp_tools())
+                    
+                    if success:
+                        st.toast("MCP 도구 새로고침 성공!", icon="✅")
+                        logger.info("MCP 도구 새로고침 성공")
+                    else:
+                        st.toast(f"MCP 도구 새로고침 실패: {result}", icon="❌")
+                        logger.error(f"MCP 도구 새로고침 실패: {result}")
+                else:
+                    st.error("이벤트 루프가 초기화되지 않았습니다. MCP 도구를 새로고침할 수 없습니다.")
+                    logger.error("이벤트 루프가 초기화되지 않아 MCP 도구 새로고침 실패")
+            except Exception as e:
+                logger.error(f"MCP 도구 새로고침 중 오류 발생: {str(e)}")
+                st.toast(f"MCP 도구 새로고침 중 오류 발생: {str(e)}", icon="❌")
+            
+            # 플래그 초기화
+            st.session_state.scheduled_mcp_refresh = False
     
     # 채팅봇 소개
     st.markdown("""

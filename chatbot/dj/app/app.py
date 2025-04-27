@@ -85,6 +85,11 @@ def initialize():
     if "scheduled_mcp_refresh" not in st.session_state:
         st.session_state.scheduled_mcp_refresh = False
 
+    if "graph" not in st.session_state:
+            logger.info("그래프 초기화")
+            from simple.dev_tool_graph import get_dev_tool_graph
+            st.session_state.graph = get_dev_tool_graph()
+
 
 async def get_mcp_tools():
     """
@@ -197,29 +202,36 @@ def clear_mcp_tools():
         logger.info("MCP 도구 캐시가 초기화되었습니다.")
 
 
-def get_chat_response(message, session_id=None):
-    url = f"{CHATBOT_API_URL}{CHAT_ENDPOINT}"
-    headers = {"Content-Type": "application/json"}
-    
-    data = {'message': message}
-
-    if session_id:
-        data['session_id'] = session_id
-
+async def get_chat_response(message, session_id=None):
+    """그래프의 ainvoke를 사용하여 응답을 생성합니다."""
     try:
-        logger.debug(f"Sending request to {url} with data: {data}")
-        response = requests.post(url, headers=headers, data=json.dumps(data))
-        response.raise_for_status()
-        return response.json()
-    except requests.exceptions.RequestException as e:
-        error_msg = ERROR_SERVER_CONNECTION.format(e)
-        logger.error(error_msg)
-        st.error(error_msg)
-        return None
-    except json.JSONDecodeError as e:
-        error_msg = ERROR_JSON_DECODE.format(e)
-        logger.error(error_msg)
-        st.error(error_msg)
+        # 요청 데이터 준비
+        from langchain_core.messages import HumanMessage
+        
+        # 세션 ID가 있으면 메시지에 추가
+        additional_kwargs = {}
+        if session_id:
+            additional_kwargs["session_id"] = session_id
+            
+        # 입력 메시지 생성
+        input_message = HumanMessage(content=message, additional_kwargs=additional_kwargs)
+        
+        # 그래프 호출
+        logger.info(f"그래프의 ainvoke 호출: {message[:1000]}...")
+        response = await st.session_state.graph.ainvoke({"messages": [input_message]})
+        
+        # 응답 변환
+        result = {
+            Response.RESPONSE.value: response["messages"][-1].content
+        }
+        
+        if session_id:
+            result[Response.SESSION_ID.value] = session_id
+            
+        return result
+    except Exception as e:
+        logger.error(f"그래프 호출 중 오류 발생: {str(e)}")
+        st.error(f"그래프 호출 중 오류 발생: {str(e)}")
         return None
 
 
@@ -336,22 +348,56 @@ def display_chat_history():
 
 async def process_chat(user_input):
     """Process user input asynchronously"""
-    logger.info(f"Processing user input: {user_input[:30]}...")
-    
-    # Add and display user message
-    add_user_message(user_input)
-    
-    # Prepare UI elements for response
-    status_placeholder, message_placeholder = prepare_assistant_ui()
-    
-    # Verify session ID exists
-    ensure_session_id()
-    
-    # Get chat response
-    response_data = get_chat_response(user_input, st.session_state.session_id)
-    
-    # Handle response
-    handle_response(response_data, message_placeholder, status_placeholder)
+    st.session_state.messages.append({"role": "user", "content": user_input})
+
+    with st.chat_message("user"):
+        st.markdown(user_input)
+
+    with st.chat_message("assistant"):
+        status_placeholder = st.status(
+            "Processing your request...", expanded=False
+        )
+        message_placeholder = st.empty()
+
+    if not st.session_state.session_id:
+        st.session_state.session_id = generate_session_id()
+        st.sidebar.info(
+            f"New session created with ID: {st.session_state.session_id}"
+        )
+
+    response_data = await get_chat_response(user_input, st.session_state.session_id)
+
+    if response_data:
+        if (
+            Response.SESSION_ID.value in response_data
+            and response_data[Response.SESSION_ID.value]
+            != st.session_state.session_id
+        ):
+            st.session_state.session_id = response_data[
+                Response.SESSION_ID.value
+            ]
+            st.sidebar.info(
+                f"Session ID updated: {st.session_state.session_id}"
+            )
+
+        message_placeholder.markdown(response_data[Response.RESPONSE.value])
+        status_placeholder.update(
+            label="✅ Complete", state="complete", expanded=False
+        )
+
+        st.session_state.messages.append(
+            {
+                "role": "assistant",
+                "content": response_data[Response.RESPONSE.value],
+            }
+        )
+    else:
+        message_placeholder.error(
+            "Failed to get a valid response from the server"
+        )
+        status_placeholder.update(
+            label="❌ Error", state="error", expanded=True
+        )
 
 
 def add_user_message(user_input):
@@ -435,7 +481,7 @@ def add_assistant_message(content):
     )
 
 
-def render_chat_tab():
+async def render_chat_tab():
     """대화창 탭 렌더링"""
     # 컨테이너를 생성하여 채팅 내역을 표시 (높이 제한)
     chat_container = st.container()
@@ -468,11 +514,8 @@ def render_chat_tab():
         st.markdown('</div>', unsafe_allow_html=True)
     
     # 채팅 탭에서만 채팅 입력 표시
-    prompt = st.chat_input("Ask something... (e.g., 'What files are in the root directory?')")
-    if prompt:
-        # 비동기 처리 실행
-        asyncio.run(process_chat(prompt))
-        st.rerun()  # UI 갱신
+    if prompt := st.chat_input("Enter your message here..."):
+        await process_chat(prompt)
 
 
 def render_tool_add_tab():
@@ -615,7 +658,7 @@ async def main():
         if "active_tab" not in st.session_state or st.session_state.active_tab != "대화창":
             st.session_state.active_tab = "대화창"
             st.session_state.active_main_tab = 0
-        render_chat_tab()
+        await render_chat_tab()
     
     # 도구 추가 탭
     with tool_tab:

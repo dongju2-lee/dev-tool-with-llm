@@ -1,12 +1,14 @@
 import streamlit as st
 import random
+import io
+from PIL import Image
 import os
 import uuid
 from api.client import MCPClient
 
 # 페이지 설정
 st.set_page_config(
-    page_title="간단한 챗봇",
+    page_title="슬라임 챗봇",
     page_icon="🤖",
     layout="centered"
 )
@@ -22,6 +24,21 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
+# strangekino.png 이미지 로드 함수
+def load_strangekino_image():
+    # 현재 스크립트의 디렉토리 위치 확인
+    current_dir = os.path.dirname(os.path.abspath(__file__))
+    # 이미지 경로 지정
+    image_path = os.path.join(current_dir, "strangekino.png")
+    
+    try:
+        # 이미지 파일 열기
+        return Image.open(image_path)
+    except Exception as e:
+        st.error(f"이미지 로드 오류: {str(e)}")
+        # 오류 발생 시 빈 이미지 반환
+        return Image.new('RGB', (100, 100), color=(255, 0, 0))
+
 # 간단한 응답 목록 (MCP 연동 실패 시 폴백용)
 responses = [
     "흥미로운 질문이네요!",
@@ -32,7 +49,7 @@ responses = [
 ]
 
 # 페이지 제목 설정
-st.title("간단한 챗봇")
+st.title("슬라임 챗봇")
 
 # 세션 상태 초기화
 if "messages" not in st.session_state:
@@ -55,14 +72,14 @@ with st.sidebar:
     # 응답 생성 방식 선택
     response_type = st.radio(
         "응답 생성 방식",
-        ["MCP 서버", "기본 (랜덤)"]
+        ["스트레인지 키노", "MCP 서버", "기본 (랜덤)"]
     )
     
     # 서버 상태 확인
     if st.button("서버 상태 확인"):
         try:
-            status = mcp_client.check_status()
-            st.success(f"서버 상태: {status['status']}, 버전: {status['version']}")
+            status = mcp_client.check_connection()
+            st.success(f"서버 상태: {status['status']}, 모델: {status.get('model', 'N/A')}")
         except Exception as e:
             st.error(f"서버 연결 오류: {str(e)}")
             # 연결 오류 시 로컬 모드로 전환
@@ -77,7 +94,14 @@ with st.sidebar:
 # 대화 이력 표시
 for message in st.session_state.messages:
     with st.chat_message(message["role"]):
-        st.markdown(message["content"])
+        # 텍스트 메시지 표시
+        if "type" not in message or message["type"] == "text":
+            st.markdown(message["content"])
+        # 이미지 메시지 표시
+        elif message["type"] == "image":
+            if "text" in message:
+                st.markdown(message["text"])
+            st.image(message["content"], caption=message.get("caption", ""), use_column_width=True)
 
 # 사용자 입력 처리
 if prompt := st.chat_input("무엇이든 물어보세요"):
@@ -89,31 +113,65 @@ if prompt := st.chat_input("무엇이든 물어보세요"):
     # 응답 생성
     with st.chat_message("assistant"):
         with st.spinner("생각 중..."):
-            if response_type == "MCP 서버":
+            # 스트레인지 키노 이미지 응답 모드
+            if response_type == "스트레인지 키노":
+                # 이미지 로드
+                image = load_strangekino_image()
+                
+                # 응답 텍스트
+                response_text = "안녕하세요! 저는 스트레인지 키노예요~"
+                st.markdown(response_text)
+                
+                # 이미지 표시
+                st.image(image, caption="스트레인지 키노", use_column_width=True)
+                
+                # 세션에 저장
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "type": "image",
+                    "content": image,
+                    "caption": "스트레인지 키노",
+                    "text": response_text
+                })
+            elif response_type == "MCP 서버":
                 try:
                     # MCP 서버로 메시지 전송
-                    response_data = mcp_client.send_message(
-                        message=prompt,
-                        thread_id=st.session_state.thread_id,
-                        context=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1]],
-                        stream=False
+                    response_data = mcp_client.process_query(
+                        query=prompt,
+                        history=[{"role": m["role"], "content": m["content"]} for m in st.session_state.messages[:-1] if "type" not in m or m["type"] == "text"]
                     )
                     
                     # 응답 추출
-                    response_content = response_data.get("content", "응답을 받지 못했습니다.")
+                    response_content = response_data.get("response", "응답을 받지 못했습니다.")
                     
-                    # 스레드 ID 업데이트 (새로 생성된 경우)
-                    if "thread_id" in response_data:
-                        st.session_state.thread_id = response_data["thread_id"]
+                    # 응답 표시
+                    st.markdown(response_content)
+                    
+                    # 세션에 저장
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "type": "text",
+                        "content": response_content
+                    })
                 except Exception as e:
                     # 오류 발생 시 대체 응답 사용
                     response_content = f"MCP 서버 연결 오류: {str(e)}\n\n기본 응답: {random.choice(responses)}"
+                    st.markdown(response_content)
+                    
+                    # 세션에 저장
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "type": "text",
+                        "content": response_content
+                    })
             else:
                 # 기본 응답 생성 (랜덤)
-                response_content = random.choice(responses) + f"\n\n당신의 메시지: {prompt}"
-            
-            # 응답 표시
-            st.markdown(response_content)
-    
-    # 응답 저장
-    st.session_state.messages.append({"role": "assistant", "content": response_content}) 
+                response = random.choice(responses) + f"\n\n당신의 메시지: {prompt}"
+                st.markdown(response)
+                
+                # 세션에 저장
+                st.session_state.messages.append({
+                    "role": "assistant",
+                    "type": "text",
+                    "content": response
+                }) 

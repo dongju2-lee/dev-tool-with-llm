@@ -12,13 +12,10 @@ import uuid
 import requests
 from typing import List, Dict, Any, Optional
 
-from contextlib import asynccontextmanager
 from langchain_core.messages import HumanMessage, AIMessage, ToolMessage, SystemMessage, BaseMessage
 from langgraph.checkpoint.memory import MemorySaver
 
 from langchain_mcp_adapters.tools import load_mcp_tools
-from langchain_mcp_adapters.client import MultiServerMCPClient
-
 
 from dotenv import load_dotenv
 
@@ -28,18 +25,6 @@ load_dotenv()
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
-
-@asynccontextmanager
-async with MultiServerMCPClient(
-    {
-        "test-mcp-server": {
-            "url": "http://localhost:8000/sse",
-            "transport": "sse"
-        }
-    }
-) as client:
-    tools = load_mcp_tools(client)
-
 
 class GeminiMCPClient:
     """Gemini API를 직접 호출하는 MCP 클라이언트"""

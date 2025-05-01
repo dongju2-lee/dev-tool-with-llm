@@ -95,3 +95,56 @@ ENV/
 # 기타
 .DS_Store
 ```
+
+# Gemini MCP 클라이언트
+
+Google의 Gemini API를 사용하여 LangChain MCP(Multi-Chain Prompt)와 연동된 챗봇 시스템입니다.
+
+## 환경 설정
+
+1. 필요한 패키지 설치:
+
+```bash
+pip install -r requirements.txt
+```
+
+2. `.env` 파일 생성 및 API 키 설정:
+
+```
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+## 파일 구성
+
+- `mcp_client_example.py`: Gemini API를 LangChain과 연결하는 커스텀 클래스 및 MCP 통합
+- `test_gemini_mcp.py`: 구현된 클라이언트 테스트 코드
+- `app.py`: Streamlit 기반 웹 인터페이스
+
+## 테스트 실행
+
+```bash
+python test_gemini_mcp.py
+```
+
+이 스크립트는 다음 두 가지 테스트를 실행합니다:
+1. Gemini API 직접 호출 테스트 (Google AI Studio API 사용)
+2. MCP 서버 통합 테스트 (MCP 서버가 실행 중이어야 함)
+
+## MCP 서버 사용
+
+MCP 서버는 다음 두 가지 방식으로 사용할 수 있습니다:
+
+1. 로컬 MCP 서버:
+   - 필요한 MCP 서버 실행 (예: `python your_mcp_server.py`)
+   - 서버가 `http://localhost:8000/sse`에서 실행 중이어야 함
+
+2. 원격 MCP 서버:
+   - `mcp_client_example.py` 파일의 서버 URL 설정을 수정
+
+## 웹 인터페이스 실행
+
+```bash
+streamlit run app.py
+```
+
+Streamlit 인터페이스에서 다양한 설정을 변경하고 테스트할 수 있습니다.

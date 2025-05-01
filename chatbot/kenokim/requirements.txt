@@ -1,10 +1,9 @@
-streamlit
-requests
-pillow
-python-dotenv
-vertexai
-langgraph
+langchain
 langchain-core
-langchain-google-vertexai
-mcp
 langchain-mcp-adapters
+langchain-google-genai
+langgraph
+python-dotenv
+requests
+streamlit
+asyncio

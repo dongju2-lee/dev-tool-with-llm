@@ -50,18 +50,6 @@ if "mcp_react_client" not in st.session_state:
 # 사이드바 설정
 with st.sidebar:
     st.header("설정")
-    
-    # API 키 정보 표시 (마스킹)
-    api_key = os.getenv("VERTEX_API_KEY", "")
-    if api_key:
-        masked_key = api_key[:4] + "*" * (len(api_key) - 8) + api_key[-4:] if len(api_key) > 8 else "****"
-        st.text_input("Vertex API Key", value=masked_key, disabled=True)
-    
-    # 프로젝트 ID 표시
-    project_id = os.getenv("GCP_PROJECT_ID", "")
-    if project_id:
-        st.text_input("GCP Project ID", value=project_id, disabled=True)
-    
     # Gemini 모델 선택
     model_options = {
         "gemini-2.0-flash": "Gemini Flash"

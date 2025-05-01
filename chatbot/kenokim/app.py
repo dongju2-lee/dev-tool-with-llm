@@ -1,6 +1,4 @@
 import streamlit as st
-import random
-from PIL import Image
 import os
 import sys
 import uuid
@@ -11,8 +9,8 @@ from api.client import MCPClient
 current_dir = os.path.dirname(os.path.abspath(__file__))
 sys.path.append(current_dir)
 
-# 이제 절대 경로로 임포트
-from chatbot.kenokim.langchain_gemini_mcp_client import GeminiMCPClient
+# 이제 상대 경로로 임포트
+from langchain_gemini_mcp_client import GeminiMCPClient
 
 # 환경 변수 로드
 load_dotenv()
@@ -34,30 +32,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# strangekino.png 이미지 로드 함수
-def load_strangekino_image():
-    # 현재 스크립트의 디렉토리 위치 확인
-    current_dir = os.path.dirname(os.path.abspath(__file__))
-    # 이미지 경로 지정
-    image_path = os.path.join(current_dir, "strangekino.png")
-    
-    try:
-        # 이미지 파일 열기
-        return Image.open(image_path)
-    except Exception as e:
-        st.error(f"이미지 로드 오류: {str(e)}")
-        # 오류 발생 시 빈 이미지 반환
-        return Image.new('RGB', (100, 100), color=(255, 0, 0))
-
-# 간단한 응답 목록 (MCP 연동 실패 시 폴백용)
-responses = [
-    "흥미로운 질문이네요!",
-    "더 자세히 설명해주실래요?",
-    "그것에 대해 더 생각해볼게요.",
-    "좋은 질문입니다!",
-    "무엇을 도와드릴까요?",
-]
 
 # 페이지 제목 설정
 st.title("슬라임 챗봇")
@@ -90,9 +64,7 @@ with st.sidebar:
     
     # Gemini 모델 선택
     model_options = {
-        "gemini-pro": "Gemini Pro",
-        "gemini-1.5-flash": "Gemini Flash",
-        "gemini-1.5-pro": "Gemini 1.5 Pro"
+        "gemini-2.0-flash": "Gemini Flash"
     }
     selected_model = st.selectbox(
         "Gemini 모델",
@@ -105,7 +77,7 @@ with st.sidebar:
     # 응답 생성 방식 선택
     response_type = st.radio(
         "응답 생성 방식",
-        ["스트레인지 키노", "MCP 서버", "MCP_REACT (LangGraph)", "기본 (랜덤)"]
+        ["MCP 서버", "MCP_REACT (LangGraph)"]
     )
 
 # MCP 클라이언트 초기화 - 사이드바에서 선택한 모델 사용
@@ -122,7 +94,12 @@ if response_type == "MCP_REACT (LangGraph)" and st.session_state.mcp_react_clien
     try:
         with st.sidebar:
             with st.spinner("LangGraph MCP 클라이언트 초기화 중..."):
-                st.session_state.mcp_react_client = GeminiMCPClient(model_name=selected_model)
+                # 새로운 초기화 방식으로 변경
+                st.session_state.mcp_react_client = GeminiMCPClient(
+                    model_name=selected_model,
+                    # 필요시 API 키 직접 전달 가능
+                    # api_key="YOUR_API_KEY"
+                )
                 st.session_state.mcp_react_client.initialize()
                 st.success("LangGraph MCP 클라이언트 초기화 성공")
     except Exception as e:
@@ -150,6 +127,23 @@ with st.sidebar:
                 response_type = "기본 (랜덤)"
         else:
             st.error("클라이언트 초기화에 실패했습니다")
+    
+    # 도구 목록 표시 영역
+    st.subheader("사용 가능한 도구")
+    if st.button("도구 목록 가져오기"):
+        if response_type == "MCP_REACT (LangGraph)" and st.session_state.mcp_react_client:
+            try:
+                with st.spinner("도구 목록 가져오는 중..."):
+                    tools = st.session_state.mcp_react_client.get_tools()
+                    if tools:
+                        st.success(f"{len(tools)}개의 도구를 찾았습니다")
+                        for tool in tools:
+                            with st.expander(f"🔧 {tool['name']}"):
+                                st.write(tool.get('description', '설명 없음'))
+                    else:
+                        st.warning("사용 가능한 도구가 없습니다")
+            except Exception as e:
+                st.error(f"도구 목록 가져오기 오류: {str(e)}")
     
     # 대화 초기화 버튼
     if st.button("대화 초기화"):
@@ -179,27 +173,7 @@ if prompt := st.chat_input("무엇이든 물어보세요"):
     # 응답 생성
     with st.chat_message("assistant"):
         with st.spinner("생각 중..."):
-            # 스트레인지 키노 이미지 응답 모드
-            if response_type == "스트레인지 키노":
-                # 이미지 로드
-                image = load_strangekino_image()
-                
-                # 응답 텍스트
-                response_text = "안녕하세요! 저는 스트레인지 키노예요~"
-                st.markdown(response_text)
-                
-                # 이미지 표시
-                st.image(image, caption="스트레인지 키노", use_column_width=True)
-                
-                # 세션에 저장
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "type": "image",
-                    "content": image,
-                    "caption": "스트레인지 키노",
-                    "text": response_text
-                })
-            elif response_type == "MCP 서버" and mcp_client:
+            if response_type == "MCP 서버" and mcp_client:
                 try:
                     # MCP 서버로 메시지 전송
                     response_data = mcp_client.process_query(
@@ -221,7 +195,7 @@ if prompt := st.chat_input("무엇이든 물어보세요"):
                     })
                 except Exception as e:
                     # 오류 발생 시 대체 응답 사용
-                    response_content = f"MCP 서버 연결 오류: {str(e)}\n\n기본 응답: {random.choice(responses)}"
+                    response_content = f"MCP 서버 연결 오류: {str(e)}"
                     st.markdown(response_content)
                     
                     # 세션에 저장
@@ -266,7 +240,7 @@ if prompt := st.chat_input("무엇이든 물어보세요"):
                     })
                 except Exception as e:
                     # 오류 발생 시 대체 응답 사용
-                    response_content = f"LangGraph MCP 처리 오류: {str(e)}\n\n기본 응답: {random.choice(responses)}"
+                    response_content = f"LangGraph MCP 처리 오류: {str(e)}"
                     st.markdown(response_content)
                     
                     # 세션에 저장
@@ -276,13 +250,13 @@ if prompt := st.chat_input("무엇이든 물어보세요"):
                         "content": response_content
                     })
             else:
-                # 기본 응답 생성 (랜덤)
-                response = random.choice(responses) + f"\n\n당신의 메시지: {prompt}"
-                st.markdown(response)
+                # 응답 생성 방식이 없거나 클라이언트가 초기화되지 않은 경우
+                response_content = "죄송합니다. 선택한 응답 생성 방식에 대한 서비스가 초기화되지 않았습니다."
+                st.markdown(response_content)
                 
                 # 세션에 저장
                 st.session_state.messages.append({
                     "role": "assistant",
                     "type": "text",
-                    "content": response
+                    "content": response_content
                 }) 

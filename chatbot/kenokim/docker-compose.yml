@@ -1,0 +1,28 @@
+version: '3.8'
+
+services:
+  # 챗봇 서비스
+  chatbot:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8501:8501"
+    environment:
+      - MCP_SERVER_URL=http://mcp-server:8000
+    volumes:
+      - .:/app
+    restart: unless-stopped
+    depends_on:
+      - mcp-server
+
+  # MCP 서버 서비스
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./mcp-server:/app
+    restart: unless-stopped 

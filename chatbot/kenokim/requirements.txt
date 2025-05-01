@@ -4,3 +4,7 @@ pillow
 python-dotenv
 vertexai
 langgraph
+langchain-core
+langchain-google-vertexai
+mcp
+langchain-mcp-adapters

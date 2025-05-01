@@ -2,9 +2,17 @@ import streamlit as st
 import random
 from PIL import Image
 import os
+import sys
 import uuid
 from dotenv import load_dotenv
 from api.client import MCPClient
+
+# 현재 디렉토리를 Python 경로에 추가
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
+
+# 이제 절대 경로로 임포트
+from chatbot.kenokim.langchain_gemini_mcp_client import GeminiMCPClient
 
 # 환경 변수 로드
 load_dotenv()
@@ -61,6 +69,10 @@ if "messages" not in st.session_state:
 if "thread_id" not in st.session_state:
     st.session_state.thread_id = str(uuid.uuid4())
 
+# 세션에 LangGraph MCP 클라이언트 초기화
+if "mcp_react_client" not in st.session_state:
+    st.session_state.mcp_react_client = None
+
 # 사이드바 설정
 with st.sidebar:
     st.header("설정")
@@ -93,7 +105,7 @@ with st.sidebar:
     # 응답 생성 방식 선택
     response_type = st.radio(
         "응답 생성 방식",
-        ["스트레인지 키노", "MCP 서버", "기본 (랜덤)"]
+        ["스트레인지 키노", "MCP 서버", "MCP_REACT (LangGraph)", "기본 (랜덤)"]
     )
 
 # MCP 클라이언트 초기화 - 사이드바에서 선택한 모델 사용
@@ -105,15 +117,35 @@ except Exception as e:
     st.sidebar.warning("환경 변수 설정을 확인하세요 (VERTEX_API_KEY, GCP_PROJECT_ID)")
     mcp_client = None
 
+# LangGraph MCP 클라이언트 초기화
+if response_type == "MCP_REACT (LangGraph)" and st.session_state.mcp_react_client is None:
+    try:
+        with st.sidebar:
+            with st.spinner("LangGraph MCP 클라이언트 초기화 중..."):
+                st.session_state.mcp_react_client = GeminiMCPClient(model_name=selected_model)
+                st.session_state.mcp_react_client.initialize()
+                st.success("LangGraph MCP 클라이언트 초기화 성공")
+    except Exception as e:
+        st.sidebar.error(f"LangGraph MCP 클라이언트 초기화 오류: {str(e)}")
+        st.session_state.mcp_react_client = None
+
 # 서버 상태 확인 버튼
 with st.sidebar:
     if st.button("서버 상태 확인"):
-        if mcp_client:
+        if response_type == "MCP_REACT (LangGraph)" and st.session_state.mcp_react_client:
+            try:
+                status = st.session_state.mcp_react_client.check_connection()
+                st.success(f"LangGraph MCP 서버 상태: {status['status']}, 모델: {status.get('model', 'N/A')}")
+                if status['status'] == 'online':
+                    st.info(f"사용 가능한 도구: {', '.join(status.get('available_tools', []))}")
+            except Exception as e:
+                st.error(f"LangGraph MCP 서버 연결 오류: {str(e)}")
+        elif mcp_client:
             try:
                 status = mcp_client.check_connection()
-                st.success(f"서버 상태: {status['status']}, 모델: {status.get('model', 'N/A')}")
+                st.success(f"MCP 서버 상태: {status['status']}, 모델: {status.get('model', 'N/A')}")
             except Exception as e:
-                st.error(f"서버 연결 오류: {str(e)}")
+                st.error(f"MCP 서버 연결 오류: {str(e)}")
                 # 연결 오류 시 로컬 모드로 전환
                 response_type = "기본 (랜덤)"
         else:
@@ -190,6 +222,51 @@ if prompt := st.chat_input("무엇이든 물어보세요"):
                 except Exception as e:
                     # 오류 발생 시 대체 응답 사용
                     response_content = f"MCP 서버 연결 오류: {str(e)}\n\n기본 응답: {random.choice(responses)}"
+                    st.markdown(response_content)
+                    
+                    # 세션에 저장
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "type": "text",
+                        "content": response_content
+                    })
+            elif response_type == "MCP_REACT (LangGraph)" and st.session_state.mcp_react_client:
+                try:
+                    # 대화 이력 추출
+                    history = [{"role": m["role"], "content": m["content"]} 
+                              for m in st.session_state.messages[:-1] 
+                              if "type" not in m or m["type"] == "text"]
+                    
+                    # LangGraph MCP ReAct 에이전트로 메시지 전송
+                    response_data = st.session_state.mcp_react_client.process_query(
+                        query=prompt,
+                        history=history,
+                        thread_id=st.session_state.thread_id
+                    )
+                    
+                    # 응답 추출
+                    response_content = response_data.get("response", "응답을 받지 못했습니다.")
+                    
+                    # 도구 출력 정보 추가
+                    tool_outputs = response_data.get("tool_outputs", [])
+                    if tool_outputs:
+                        tool_info = "\n\n**도구 사용 정보:**\n"
+                        for tool_output in tool_outputs:
+                            tool_info += f"- **{tool_output.get('tool', '알 수 없음')}**: {tool_output.get('result', '')}\n"
+                        response_content += tool_info
+                    
+                    # 응답 표시
+                    st.markdown(response_content)
+                    
+                    # 세션에 저장
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        "type": "text",
+                        "content": response_content
+                    })
+                except Exception as e:
+                    # 오류 발생 시 대체 응답 사용
+                    response_content = f"LangGraph MCP 처리 오류: {str(e)}\n\n기본 응답: {random.choice(responses)}"
                     st.markdown(response_content)
                     
                     # 세션에 저장

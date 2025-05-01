@@ -1,3 +1,6 @@
-fastapi==0.109.2
-uvicorn==0.27.1
-pydantic==2.6.1 
+pydantic
+mcp
+python-dotenv
+fastapi
+uvicorn
+fastmcp

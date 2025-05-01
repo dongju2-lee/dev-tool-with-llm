@@ -1,16 +1,17 @@
-FROM python:3.9-slim
+FROM python:3.13-slim
 
 WORKDIR /app
 
-# 필요한 패키지 설치
+# Install required packages
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# 애플리케이션 코드 복사
+# Copy application code
 COPY . .
 
-# 포트 설정
+# Expose port for HTTP/SSE MCP server
 EXPOSE 8000
 
-# 실행 명령
-CMD ["uvicorn", "app:app", "--host", "0.0.0.0", "--port", "8000"] 
+# Run the MCP server with SSE transport
+# Reference: https://modelcontextprotocol.io/llms-full.txt
+CMD ["python", "app.py"] 

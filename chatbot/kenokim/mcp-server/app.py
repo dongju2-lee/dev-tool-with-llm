@@ -1,30 +1,20 @@
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel
-from typing import List, Dict, Any, Optional
-import uvicorn
+"""
+MCP HTTP 서버 예제
+
+이 모듈은 FastMCP를 사용한 HTTP 방식의 Model Context Protocol 서버입니다.
+"""
+
+from mcp.server.fastmcp import FastMCP
+import logging
+from typing import Dict, Any, Optional, List
 import uuid
 from datetime import datetime
 import time
 import random
 
-app = FastAPI(title="MCP 서버", description="모델 컨텍스트 프로토콜(MCP) 서버")
-
-# CORS 설정
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# 메시지 모델
-class Message(BaseModel):
-    message: str
-    thread_id: Optional[str] = None
-    context: Optional[List[Dict[str, Any]]] = None
-    stream: Optional[bool] = False
+# 로깅 설정
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # 간단한 메모리 저장소 (실제로는 데이터베이스를 사용할 것)
 threads = {}
@@ -33,24 +23,38 @@ messages = {}
 # 시작 시간 기록
 start_time = time.time()
 
-@app.get("/")
-def read_root():
-    return {"message": "MCP 서버가 실행 중입니다"}
+# FastMCP 서버 생성
+mcp = FastMCP("ChatServer")
 
-@app.get("/status")
-def get_status():
-    """서버 상태 확인 엔드포인트"""
+@mcp.tool()
+def get_status() -> Dict[str, Any]:
+    """서버 상태 정보를 반환합니다.
+    
+    Returns:
+        서버 상태 정보 (상태, 버전, 가동 시간)
+    """
+    logger.info("get_status 도구 호출")
     return {
         "status": "online",
         "version": "0.1.0",
         "uptime": int(time.time() - start_time)
     }
 
-@app.post("/chat")
-async def chat(message_data: Message, request: Request):
-    """채팅 메시지 처리 엔드포인트"""
+@mcp.tool()
+def send_message(message: str, thread_id: Optional[str] = None) -> Dict[str, Any]:
+    """채팅 메시지를 전송하고 응답을 받습니다.
+    
+    Args:
+        message: 사용자 메시지
+        thread_id: 대화 스레드 ID (없으면 새로 생성)
+        
+    Returns:
+        응답 메시지와 스레드 ID
+    """
+    logger.info(f"send_message 도구 호출: 메시지='{message}', 스레드={thread_id}")
+    
     # 스레드 ID가 없으면 새로 생성
-    thread_id = message_data.thread_id or str(uuid.uuid4())
+    thread_id = thread_id or str(uuid.uuid4())
     
     # 스레드 정보 저장/업데이트
     if thread_id not in threads:
@@ -64,7 +68,7 @@ async def chat(message_data: Message, request: Request):
     message_obj = {
         "id": message_id,
         "role": "user",
-        "content": message_data.message,
+        "content": message,
         "created_at": datetime.now().isoformat()
     }
     
@@ -79,7 +83,7 @@ async def chat(message_data: Message, request: Request):
         "좋은 질문이네요. 더 자세히 알려주시겠어요?",
         "흥미로운 주제입니다. 어떤 측면에 관심이 있으신가요?",
         "도움이 필요하시면 언제든지 물어보세요!",
-        f"'{message_data.message}'에 대한 답변을 준비 중입니다..."
+        f"'{message}'에 대한 답변을 준비 중입니다..."
     ]
     
     response_content = random.choice(response_options)
@@ -94,27 +98,33 @@ async def chat(message_data: Message, request: Request):
     
     messages[thread_id].append(response_obj)
     
-    # 스트리밍이 아닌 경우 바로 응답
-    if not message_data.stream:
-        return {
-            "content": response_content,
-            "thread_id": thread_id
-        }
-    
-    # 스트리밍 응답은 구현 예정
     return {
         "content": response_content,
         "thread_id": thread_id
     }
 
-@app.get("/threads")
-def get_threads():
-    """모든 스레드 목록 조회"""
+@mcp.tool()
+def list_threads() -> Dict[str, List[Dict[str, Any]]]:
+    """모든 스레드 목록을 조회합니다.
+    
+    Returns:
+        모든 스레드 목록
+    """
+    logger.info("list_threads 도구 호출")
     return {"threads": [{"thread_id": tid, **info} for tid, info in threads.items()]}
 
-@app.post("/threads")
-def create_thread(metadata: Optional[Dict[str, Any]] = None):
-    """새 스레드 생성"""
+@mcp.tool()
+def create_thread(metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    """새 스레드를 생성합니다.
+    
+    Args:
+        metadata: 스레드 메타데이터(선택 사항)
+        
+    Returns:
+        생성된 스레드 정보
+    """
+    logger.info(f"create_thread 도구 호출: 메타데이터={metadata}")
+    
     thread_id = str(uuid.uuid4())
     threads[thread_id] = {
         "created_at": datetime.now().isoformat(),
@@ -128,19 +138,35 @@ def create_thread(metadata: Optional[Dict[str, Any]] = None):
         "metadata": threads[thread_id]["metadata"]
     }
 
-@app.get("/threads/{thread_id}/messages")
-def get_thread_messages(thread_id: str):
-    """특정 스레드의 메시지 조회"""
+@mcp.tool()
+def get_thread_messages(thread_id: str) -> Dict[str, List[Dict[str, Any]]]:
+    """특정 스레드의 메시지를 조회합니다.
+    
+    Args:
+        thread_id: 스레드 ID
+        
+    Returns:
+        해당 스레드의 메시지 목록
+    """
+    logger.info(f"get_thread_messages 도구 호출: 스레드={thread_id}")
+    
     if thread_id not in threads:
-        raise HTTPException(status_code=404, detail="스레드를 찾을 수 없습니다")
+        return {"error": "스레드를 찾을 수 없습니다", "messages": []}
     
     return {"messages": messages.get(thread_id, [])}
 
-@app.post("/tools/execute")
-def execute_tool(tool_request: Dict[str, Any]):
-    """도구 실행 엔드포인트"""
-    tool_name = tool_request.get("tool_name")
-    parameters = tool_request.get("parameters", {})
+@mcp.tool()
+def execute_tool(tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+    """도구를 실행합니다.
+    
+    Args:
+        tool_name: 실행할 도구 이름
+        parameters: 도구 파라미터
+        
+    Returns:
+        도구 실행 결과
+    """
+    logger.info(f"execute_tool 도구 호출: 도구={tool_name}, 파라미터={parameters}")
     
     # 실제 도구 실행 로직은 구현 예정
     return {
@@ -148,6 +174,17 @@ def execute_tool(tool_request: Dict[str, Any]):
         "status": "success"
     }
 
-# 직접 실행 시 사용
 if __name__ == "__main__":
-    uvicorn.run(app, host="0.0.0.0", port=8000) 
+    # HTTP 모드로 서버 실행 (포트 8000)
+    logger.info("MCP HTTP 서버 시작...")
+    try:
+        # mcp.run 메서드는 'transport'만 인식하고 'port'를 직접 인자로 받지 않음
+        # 대신 'stdio' 또는 'sse' 전송 방식을 선택하고, 
+        # 'sse'의 경우에는 FastAPI/Uvicorn이 내부적으로 실행됨
+        # 참조: https://github.com/jlowin/fastmcp
+        mcp.run(transport="sse")
+        
+    except KeyboardInterrupt:
+        logger.info("서버가 중지되었습니다.")
+    except Exception as e:
+        logger.error(f"서버 오류: {str(e)}") 

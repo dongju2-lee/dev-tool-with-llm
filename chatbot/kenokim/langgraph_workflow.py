@@ -4,11 +4,16 @@
 """
 
 import os
-from typing import Dict, List, Any, TypedDict, Optional, Union, Callable
+from typing import Dict, List, Any, TypedDict, Optional
 from langgraph.graph import StateGraph, END
 from api.client import VertexAIClient
 from PIL import Image
 import io
+
+from dotenv import load_dotenv
+
+# 환경 변수 로드
+load_dotenv()
 
 # 상태 타입 정의
 class ChatState(TypedDict):

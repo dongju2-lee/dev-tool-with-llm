@@ -23,15 +23,28 @@ gemini_model = ChatGoogleGenerativeAI(
 )
 
 @asynccontextmanager
-async def make_graph():
-    """Creates a ReAct agent with the Gemini model and MCP tools if available"""
-    logger.info("Creating ReAct agent with Gemini model")
+async def make_graph(
+    client_name="mcp-server-test", 
+    url="http://localhost:8000/sse", 
+    transport="sse"
+):
+    """Creates a ReAct agent with the Gemini model and MCP tools if available
+    
+    Args:
+        client_name: MCP 서버 클라이언트 이름
+        url: MCP 서버 URL
+        transport: MCP 서버 전송 방식 (sse, websocket 등)
+    
+    Yields:
+        ReAct 에이전트
+    """
+    logger.info(f"Creating ReAct agent with Gemini model, connecting to {url}")
     try:
         async with MultiServerMCPClient(
             {
-                "mcp-server-test": {
-                    "url": "http://localhost:8000/sse",
-                    "transport": "sse"
+                client_name: {
+                    "url": url,
+                    "transport": transport
                 }
             }
         ) as client:
@@ -39,6 +52,7 @@ async def make_graph():
             agent = create_react_agent(gemini_model, client.get_tools())
             yield agent
     except Exception as e:
+        logger.error(f"Error creating ReAct agent: {str(e)}")
         logger.error(traceback.format_exc())
 
 # 간단한 사용 예시

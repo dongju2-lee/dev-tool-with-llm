@@ -21,7 +21,7 @@ messages = {}
 start_time = time.time()
 
 # Grafana URL을 환경 변수에서 가져오거나 기본값 사용
-GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://localhost:3000")
+GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
 logger.info(f"Grafana URL: {GRAFANA_URL}")
 
 # FastMCP 서버 생성
@@ -62,10 +62,14 @@ def get_sample_png(message: str) -> Dict[str, Any]:
         "height": "400"
     }
     
+    headers = {
+        "Authorization": f"Bearer <GRAFANA_API_KEY"
+    }
+    
     try:
         # Grafana에 HTTP 요청
         logger.info(f"Grafana 요청 전송: {url}")
-        response = requests.get(url, params=params)
+        response = requests.get(url, params=params, headers=headers)
         
         # 응답 확인
         if response.status_code == 200:

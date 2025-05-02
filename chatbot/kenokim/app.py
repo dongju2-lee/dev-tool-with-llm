@@ -165,6 +165,11 @@ for message in st.session_state.messages:
                 st.markdown(message["text"])
             st.image(message["content"], caption=message.get("caption", ""), use_column_width=True)
 
+
+# 대화 응답 처리
+# 1. content_type 이 image/png 인 경우 data 를 읽어서 ui 에 뿌려준다. (base64)
+# 2. AIMessage 가 있는 경우 content 를 읽어서 ui 에 뿌려준다.
+
 # MCP 에이전트를 통한 응답 생성 함수
 async def get_mcp_response(query, history, timeout_seconds=60):
     """MCP 에이전트를 통해 응답을 생성하는 함수"""
@@ -187,7 +192,7 @@ async def get_mcp_response(query, history, timeout_seconds=60):
                     timeout=timeout_seconds
                 )
                 return {
-                    "response": str(result),
+                    "response": result,
                     "status": "success"
                 }
             except asyncio.TimeoutError:
@@ -202,6 +207,70 @@ async def get_mcp_response(query, history, timeout_seconds=60):
             "response": f"오류가 발생했습니다: {str(e)}",
             "status": "error"
         }
+
+# 응답에서 텍스트와 이미지 추출 함수
+def process_response(response):
+    """MCP 응답에서 텍스트와 이미지 추출
+    
+    Args:
+        response: MCP 에이전트 응답
+    
+    Returns:
+        dict: 텍스트 내용과 이미지 데이터 포함
+    """
+    results = []
+    
+    # 문자열인 경우 그대로 반환
+    if isinstance(response, str):
+        return {"type": "text", "content": response}
+    
+    # 딕셔너리 형태로 응답이 온 경우
+    if isinstance(response, dict):
+        # AIMessage가 포함된 메시지 배열 처리
+        if "messages" in response:
+            for msg in response["messages"]:
+                # AIMessage 객체 처리
+                if hasattr(msg, "__class__") and msg.__class__.__name__ == "AIMessage":
+                    # 텍스트 내용 추출
+                    if hasattr(msg, "content") and msg.content:
+                        results.append({"type": "text", "content": msg.content})
+                    
+                    # 이미지 추출 (tool_outputs에서 base64 이미지 찾기)
+                    if hasattr(msg, "tool_calls") and msg.tool_calls:
+                        for tool_call in msg.tool_calls:
+                            if "content_type" in tool_call.get("args", {}) and "image" in tool_call["args"]["content_type"]:
+                                if "data" in tool_call["args"]:
+                                    results.append({
+                                        "type": "image",
+                                        "content": tool_call["args"]["data"],
+                                        "caption": tool_call["args"].get("message", "")
+                                    })
+                
+                # ToolMessage 객체 처리
+                elif hasattr(msg, "__class__") and msg.__class__.__name__ == "ToolMessage":
+                    if hasattr(msg, "content"):
+                        try:
+                            tool_data = eval(msg.content)
+                            if isinstance(tool_data, dict) and "content_type" in tool_data and "image" in tool_data["content_type"]:
+                                if "data" in tool_data:
+                                    results.append({
+                                        "type": "image",
+                                        "content": tool_data["data"],
+                                        "caption": tool_data.get("message", "")
+                                    })
+                        except:
+                            pass
+    
+    # 결과가 없으면 원본 응답을 문자열로 변환
+    if not results:
+        return {"type": "text", "content": str(response)}
+    
+    # 결과가 하나면 그대로 반환
+    if len(results) == 1:
+        return results[0]
+    
+    # 여러 결과가 있으면 배열로 반환
+    return results
 
 # 사용자 입력 처리
 if prompt := st.chat_input("무엇이든 물어보세요"):
@@ -224,18 +293,51 @@ if prompt := st.chat_input("무엇이든 물어보세요"):
                     get_mcp_response(prompt, history, st.session_state.timeout_seconds)
                 )
                 
-                # 응답 추출
+                # 응답 추출 및 처리
                 response_content = response_data.get("response", "응답을 받지 못했습니다.")
+                processed_response = process_response(response_content)
                 
                 # 응답 표시
-                st.markdown(response_content)
+                if isinstance(processed_response, list):
+                    # 여러 응답 처리
+                    for item in processed_response:
+                        if item["type"] == "text":
+                            st.markdown(item["content"])
+                        elif item["type"] == "image":
+                            try:
+                                import base64
+                                from io import BytesIO
+                                image_data = base64.b64decode(item["content"])
+                                print(image_data)
+                                st.image(BytesIO(image_data), caption=item.get("caption", ""))
+                            except Exception as e:
+                                st.error(f"이미지 처리 오류: {str(e)}")
+                else:
+                    # 단일 응답 처리
+                    if processed_response["type"] == "text":
+                        st.markdown(processed_response["content"])
+                    elif processed_response["type"] == "image":
+                        try:
+                            import base64
+                            from io import BytesIO
+                            image_data = base64.b64decode(processed_response["content"])
+                            st.image(BytesIO(image_data), caption=processed_response.get("caption", ""))
+                        except Exception as e:
+                            st.error(f"이미지 처리 오류: {str(e)}")
                 
                 # 세션에 저장
-                st.session_state.messages.append({
-                    "role": "assistant",
-                    "type": "text",
-                    "content": response_content
-                })
+                if isinstance(processed_response, list):
+                    for item in processed_response:
+                        st.session_state.messages.append({
+                            "role": "assistant",
+                            **item
+                        })
+                else:
+                    st.session_state.messages.append({
+                        "role": "assistant",
+                        **processed_response
+                    })
+                
             except Exception as e:
                 # 오류 발생 시 대체 응답 사용
                 response_content = f"처리 오류: {str(e)}"

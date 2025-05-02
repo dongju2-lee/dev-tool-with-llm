@@ -10,16 +10,22 @@ import platform
 from dotenv import load_dotenv
 from langchain_core.messages import HumanMessage
 
-# 현재 디렉토리를 Python 경로에 추가
-current_dir = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(current_dir)
-
 # Windows 환경 특별 처리
 if platform.system() == "Windows":
     asyncio.set_event_loop_policy(asyncio.WindowsProactorEventLoopPolicy())
 
-# nest_asyncio 적용 - 중첩된 이벤트 루프 허용
+# nest_asyncio 적용 - 중첩 이벤트 루프 허용
 nest_asyncio.apply()
+
+# 글로벌 이벤트 루프 생성 및 재사용
+if "event_loop" not in st.session_state:
+    loop = asyncio.new_event_loop()
+    st.session_state.event_loop = loop
+    asyncio.set_event_loop(loop)
+
+# 현재 디렉토리를 Python 경로에 추가
+current_dir = os.path.dirname(os.path.abspath(__file__))
+sys.path.append(current_dir)
 
 # mcp_client_agent에서 make_graph 함수 임포트
 from mcp_client_agent import make_graph
@@ -37,12 +43,6 @@ st.set_page_config(
     page_icon="🤖",
     layout="centered"
 )
-
-# 글로벌 이벤트 루프 생성 및 재사용
-if "event_loop" not in st.session_state:
-    loop = asyncio.new_event_loop()
-    st.session_state.event_loop = loop
-    asyncio.set_event_loop(loop)
 
 # CSS 추가
 st.markdown("""
@@ -246,4 +246,4 @@ if prompt := st.chat_input("무엇이든 물어보세요"):
                     "role": "assistant",
                     "type": "text",
                     "content": response_content
-                })
+                }) 

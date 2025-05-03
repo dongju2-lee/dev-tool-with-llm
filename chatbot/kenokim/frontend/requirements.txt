@@ -1,0 +1,5 @@
+streamlit
+requests
+python-dotenv
+nest-asyncio
+asyncio 

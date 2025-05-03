@@ -1,0 +1,11 @@
+langchain
+langchain-core
+langchain-mcp-adapters
+langchain-google-genai
+langgraph
+python-dotenv
+requests
+fastapi
+uvicorn
+pydantic
+asyncio 

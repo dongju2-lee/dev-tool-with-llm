@@ -1,17 +1,33 @@
 version: '3.8'
 
 services:
-  # 챗봇 서비스
-  chatbot:
+  # 프론트엔드 (Streamlit)
+  frontend:
     build:
-      context: .
+      context: ./frontend
       dockerfile: Dockerfile
     ports:
       - "8501:8501"
     environment:
-      - MCP_SERVER_URL=http://mcp-server:8000
+      - BACKEND_API_URL=http://backend:8000
     volumes:
-      - .:/app
+      - ./frontend:/app
+    restart: unless-stopped
+    depends_on:
+      - backend
+
+  # 백엔드 (FastAPI)
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - .:/app/parent  # 상위 디렉토리 마운트 (mcp_client_agent.py 접근용)
+    environment:
+      - PYTHONPATH=/app:/app/parent
     restart: unless-stopped
     depends_on:
       - mcp-server
@@ -22,7 +38,7 @@ services:
       context: ./mcp-server
       dockerfile: Dockerfile
     ports:
-      - "8000:8000"
+      - "8002:8000"  # 호스트 8002 포트로 매핑 (백엔드가 8000 사용)
     volumes:
       - ./mcp-server:/app
     restart: unless-stopped 

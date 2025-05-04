@@ -1,0 +1,136 @@
+version: '3'
+
+services:
+  # Tempo API 서버: Tempo 접근을 담당
+  tempo-api:
+    build:
+      context: ./tempo-api
+      dockerfile: Dockerfile
+    ports:
+      - "8015:8005"
+    environment:
+      - PORT=8005
+      - TEMPO_URL=http://172.30.1.73:3200
+      - LOG_LEVEL=INFO
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8005/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      
+  # Tempo MCP 서버: Tempo API와 LangGraph 연결
+  tempo-mcp:
+    build:
+      context: ./tempo-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8014:8004"
+    depends_on:
+      - tempo-api
+    environment:
+      - PORT=8004
+      - TEMPO_API_URL=http://tempo-api:8005
+      - LANGGRAPH_URL=http://langgraph:8001
+      - LOG_LEVEL=INFO
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8004/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      
+  # Loki API 서버: Loki 접근을 담당
+  loki-api:
+    build:
+      context: ./loki-api
+      dockerfile: Dockerfile
+    ports:
+      - "8012:8002"
+    environment:
+      - PORT=8002
+      - LOKI_URL=http://172.30.1.73:3100
+      - LOKI_USERNAME=admin
+      - LOKI_PASSWORD=admin
+      - LOG_LEVEL=INFO
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      
+  # Loki MCP 서버: Loki API와 LangGraph 연결
+  loki-mcp:
+    build:
+      context: ./loki-mcp
+      dockerfile: Dockerfile
+    ports:
+      - "8013:8003"
+    depends_on:
+      - loki-api
+    environment:
+      - PORT=8003
+      - LOKI_API_URL=http://loki-api:8002
+      - LANGGRAPH_URL=http://langgraph:8001
+      - LOG_LEVEL=INFO
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8003/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # LangGraph 서버: 자연어 처리와 로직 관리
+  langgraph:
+    build:
+      context: ./langgraph
+      dockerfile: Dockerfile
+    ports:
+      - "8001:8001"
+    environment:
+      - PORT=8001
+      - GOOGLE_API_KEY=
+      - LOKI_URL=http://172.30.1.73:3100
+      - LOKI_USERNAME=admin
+      - LOKI_PASSWORD=admin
+      - TEMPO_MCP_URL=http://tempo-mcp:8004
+      - MCP_URL=http://loki-mcp:8003
+    networks:
+      - mcp-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Streamlit 프론트엔드: 사용자 인터페이스
+  streamlit:
+    build:
+      context: ./streamlit
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8501"
+    depends_on:
+      - langgraph
+      - tempo-mcp
+      - loki-mcp
+    environment:
+      - PORT=8501
+      - MCP_URL=http://langgraph:8001
+      - LANGGRAPH_URL=http://langgraph:8001
+      - TEMPO_MCP_URL=http://tempo-mcp:8004
+      - LOKI_MCP_URL=http://loki-mcp:8003
+      - GRAFANA_URL=http://172.30.1.73:3000
+      - LOKI_URL=http://172.30.1.73:3100
+      - TEMPO_URL=http://172.30.1.73:3200
+    networks:
+      - mcp-network
+
+networks:
+  mcp-network:
+    driver: bridge 

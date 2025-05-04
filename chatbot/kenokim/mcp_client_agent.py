@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize the Gemini model
 gemini_model = ChatGoogleGenerativeAI(
-    model="gemini-2.0-flash",
+    model="gemini-2.5-flash-preview-04-17",
     google_api_key=os.getenv("GEMINI_API_KEY"),
     temperature=0
 )

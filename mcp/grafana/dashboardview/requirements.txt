@@ -5,3 +5,4 @@ fastapi
 uvicorn
 fastmcp
 requests
+urllib3

@@ -249,6 +249,7 @@ def process_response(response):
                 # ToolMessage 객체 처리
                 elif hasattr(msg, "__class__") and msg.__class__.__name__ == "ToolMessage":
                     if hasattr(msg, "content"):
+                        # 먼저 문자열이 JSON 형식인지 확인
                         try:
                             tool_data = eval(msg.content)
                             if isinstance(tool_data, dict) and "content_type" in tool_data and "image" in tool_data["content_type"]:
@@ -259,7 +260,20 @@ def process_response(response):
                                         "caption": tool_data.get("message", "")
                                     })
                         except:
-                            pass
+                            # content가 바로 base64 문자열인 경우 (시작이 i로 시작하고 길이가 길면 base64 PNG로 간주)
+                            content = msg.content.strip()
+                            if content.startswith('iVBOR') and len(content) > 1000:
+                                results.append({
+                                    "type": "image",
+                                    "content": content,
+                                    "caption": f"Panel image from {msg.name}" if hasattr(msg, "name") else "Panel image"
+                                })
+                            # 에러 메시지인 경우
+                            elif "Error" in content:
+                                results.append({
+                                    "type": "text",
+                                    "content": f"도구 호출 오류: {content}"
+                                })
     
     # 결과가 없으면 원본 응답을 문자열로 변환
     if not results:

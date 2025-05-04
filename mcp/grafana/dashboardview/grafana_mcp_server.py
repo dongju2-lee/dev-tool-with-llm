@@ -1,13 +1,19 @@
 from mcp.server.fastmcp import FastMCP
 import logging
 from typing import Dict, Any, Optional, List
-import uuid
-from datetime import datetime
 import time
-import random
 import requests
 import base64
 import os
+from urllib.parse import quote_plus
+from dotenv import load_dotenv
+
+# .env 파일의 절대 경로 계산
+current_dir = os.path.dirname(os.path.abspath(__file__))
+env_path = os.path.join(current_dir, '.env')
+
+# .env 파일 로드 (있는 경우) - override=True로 설정하여 기존 환경 변수 덮어쓰기
+load_dotenv(dotenv_path=env_path, override=True)
 
 # 로깅 설정
 logging.basicConfig(level=logging.INFO)
@@ -22,225 +28,384 @@ start_time = time.time()
 
 # Grafana URL을 환경 변수에서 가져오거나 기본값 사용
 GRAFANA_URL = os.environ.get("GRAFANA_URL", "http://grafana:3000")
+# API 키를 환경 변수에서 가져오기
+GRAFANA_API_KEY = os.environ.get("GRAFANA_API_KEY", "")
 logger.info(f"Grafana URL: {GRAFANA_URL}")
+logger.info(f"API Key configured: {'Yes' if GRAFANA_API_KEY else 'No'}")
+logger.info(f"Using .env from: {env_path}")
+logger.info(f"API Key: {GRAFANA_API_KEY[:5]}...{GRAFANA_API_KEY[-5:] if GRAFANA_API_KEY else ''}")
 
 # FastMCP 서버 생성
-mcp = FastMCP("ChatServer")
+mcp = FastMCP("GrafanaDashboardServer")
+
+def get_grafana_headers():
+    """Grafana API 요청에 사용할 헤더를 반환합니다."""
+    if GRAFANA_API_KEY:
+        return {
+            "Authorization": f"Bearer {GRAFANA_API_KEY}",
+            "Content-Type": "application/json"
+            }
+    return {}
+
+# 데이터소스 조회 도구
 
 @mcp.tool()
-def get_status() -> Dict[str, Any]:
-    """서버 상태 정보를 반환합니다.
+def list_datasources() -> List[Dict[str, Any]]:
+    """Grafana의 모든 데이터소스 목록을 반환합니다.
     
     Returns:
-        서버 상태 정보 (상태, 버전, 가동 시간)
+        List[Dict[str, Any]]: 데이터소스 목록
     """
-    logger.info("get_status 도구 호출")
-    return {
-        "status": "online",
-        "version": "0.1.0",
-        "uptime": int(time.time() - start_time),
-        "grafana_url": GRAFANA_URL
-    }
+    logger.info("list_datasources 도구 호출")
 
+    url = f"{GRAFANA_URL}/api/datasources"
+    
+    try:
+        response = requests.get(url, headers=get_grafana_headers())
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"데이터소스 목록 가져오기 실패: HTTP {response.status_code}, {response.text}")
+            return []
+    
+    except Exception as e:
+        logger.error(f"데이터소스 목록 가져오기 오류: {str(e)}")
+        return []
 
 @mcp.tool()
-def get_sample_png(message: str) -> Dict[str, Any]:
-    """대시보드 스크린샷을 반환합니다."""
+def get_datasource(id_or_name: str) -> Dict[str, Any]:
+    """특정 데이터소스의 상세 정보를 반환합니다.
     
-    logger.info(f"get_sample_png 도구 호출: 메시지={message}")
+    Args:
+        id_or_name: 데이터소스의 ID 또는 이름
+        
+    Returns:
+        Dict[str, Any]: 데이터소스 상세 정보
+    """
+    logger.info(f"get_datasource 도구 호출: id_or_name={id_or_name}")
     
-    # Grafana 렌더링 URL 구성 (환경 변수에서 가져온 URL 사용)
-    url = f"{GRAFANA_URL}/render/d-solo/spring_boot_21/spring-boot-3-x-statistics"
-    params = {
-        "orgId": "1",
-        "from": "now-1h",
-        "to": "now",
-        "panelId": "42",
-        "var-application": "target-api",
-        "var-instance": "target-api:8080",
-        "width": "800",
-        "height": "400"
+    # ID인지 이름인지 확인 (숫자면 ID로 가정)
+    if id_or_name.isdigit():
+        url = f"{GRAFANA_URL}/api/datasources/{id_or_name}"
+    else:
+        url = f"{GRAFANA_URL}/api/datasources/name/{quote_plus(id_or_name)}"
+    
+    try:
+        response = requests.get(url, headers=get_grafana_headers())
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"데이터소스 정보 가져오기 실패: HTTP {response.status_code}, {response.text}")
+            return {"error": f"데이터소스 정보 가져오기 실패: HTTP {response.status_code}"}
+    
+    except Exception as e:
+        logger.error(f"데이터소스 정보 가져오기 오류: {str(e)}")
+        return {"error": f"데이터소스 정보 가져오기 오류: {str(e)}"}
+
+@mcp.tool()
+def test_datasource(id_or_name: str) -> Dict[str, Any]:
+    """데이터소스 연결을 테스트합니다.
+    
+    Args:
+        id_or_name: 테스트할 데이터소스의 ID 또는 이름
+        
+    Returns:
+        Dict[str, Any]: 테스트 결과
+    """
+    logger.info(f"test_datasource 도구 호출: id_or_name={id_or_name}")
+    
+    # 먼저 데이터소스 정보 가져오기
+    datasource = get_datasource(id_or_name)
+    
+    if "error" in datasource:
+        return datasource
+    
+    # 데이터소스 ID로 테스트 요청
+    url = f"{GRAFANA_URL}/api/datasources/{datasource.get('id')}/health"
+    
+    try:
+        response = requests.get(url, headers=get_grafana_headers())
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"데이터소스 테스트 실패: HTTP {response.status_code}, {response.text}")
+            return {"status": "error", "message": f"데이터소스 테스트 실패: HTTP {response.status_code}"}
+    
+    except Exception as e:
+        logger.error(f"데이터소스 테스트 오류: {str(e)}")
+        return {"status": "error", "message": f"데이터소스 테스트 오류: {str(e)}"}
+
+# 대시보드 조회 도구
+
+@mcp.tool()
+def list_dashboards(folder_id: Optional[int] = None, query: Optional[str] = None) -> List[Dict[str, Any]]:
+    """대시보드 목록을 반환합니다.
+    
+    Args:
+        folder_id: 특정 폴더의 대시보드만 필터링 (선택 사항)
+        query: 검색 쿼리 (선택 사항)
+        
+    Returns:
+        List[Dict[str, Any]]: 대시보드 목록
+    """
+    logger.info(f"list_dashboards 도구 호출: folder_id={folder_id}, query={query}")
+    
+    url = f"{GRAFANA_URL}/api/search"
+    params = {}
+    
+    if folder_id is not None:
+        params["folderIds"] = folder_id
+    
+    if query:
+        params["query"] = query
+    
+    # 대시보드만 검색
+    params["type"] = "dash-db"
+    
+    try:
+        response = requests.get(url, params=params, headers=get_grafana_headers())
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"대시보드 목록 가져오기 실패: HTTP {response.status_code}, {response.text}")
+            return []
+    
+    except Exception as e:
+        logger.error(f"대시보드 목록 가져오기 오류: {str(e)}")
+        return []
+
+@mcp.tool()
+def get_dashboard(uid: str) -> Dict[str, Any]:
+    """특정 대시보드의 상세 정보를 반환합니다.
+    
+    Args:
+        uid: 대시보드 UID
+        
+    Returns:
+        Dict[str, Any]: 대시보드 상세 정보
+    """
+    logger.info(f"get_dashboard 도구 호출: uid={uid}")
+    
+    url = f"{GRAFANA_URL}/api/dashboards/uid/{uid}"
+    
+    try:
+        response = requests.get(url, headers=get_grafana_headers())
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"대시보드 정보 가져오기 실패: HTTP {response.status_code}, {response.text}")
+            return {"error": f"대시보드 정보 가져오기 실패: HTTP {response.status_code}"}
+    
+    except Exception as e:
+        logger.error(f"대시보드 정보 가져오기 오류: {str(e)}")
+        return {"error": f"대시보드 정보 가져오기 오류: {str(e)}"}
+
+# 패널 조회 도구
+
+@mcp.tool()
+def list_panels(dashboard_uid: str) -> List[Dict[str, Any]]:
+    """특정 대시보드에 포함된 패널 목록을 반환합니다.
+    
+    Args:
+        dashboard_uid: 대시보드 UID
+        
+    Returns:
+        List[Dict[str, Any]]: 패널 목록
+    """
+    logger.info(f"list_panels 도구 호출: dashboard_uid={dashboard_uid}")
+    
+    # 대시보드 정보 가져오기
+    dashboard = get_dashboard(dashboard_uid)
+    
+    if "error" in dashboard:
+        return []
+    
+    try:
+        panels = []
+        # 대시보드 모델에서 패널 추출
+        dashboard_data = dashboard.get("dashboard", {})
+        
+        for panel in dashboard_data.get("panels", []):
+            panels.append({
+                "id": panel.get("id"),
+                "title": panel.get("title"),
+                "type": panel.get("type"),
+                "description": panel.get("description", ""),
+                "datasource": panel.get("datasource")
+            })
+        
+        return panels
+    
+    except Exception as e:
+        logger.error(f"패널 목록 추출 오류: {str(e)}")
+        return []
+
+@mcp.tool()
+def get_panel_data(dashboard_uid: str, panel_id: int, time_range: Dict[str, str]) -> Dict[str, Any]:
+    """특정 패널의 데이터를 쿼리합니다.
+    
+    Args:
+        dashboard_uid: 대시보드 UID
+        panel_id: 패널 ID
+        time_range: 시간 범위 (딕셔너리 형태: {"from": "now-6h", "to": "now"} 등)
+        
+    Returns:
+        Dict[str, Any]: 패널 데이터
+    """
+    logger.info(f"get_panel_data 도구 호출: dashboard_uid={dashboard_uid}, panel_id={panel_id}, time_range={time_range}")
+    
+    # 대시보드 정보 가져오기
+    dashboard = get_dashboard(dashboard_uid)
+    
+    if "error" in dashboard:
+        return {"error": dashboard.get("error")}
+    
+    # 패널 찾기
+    panel = None
+    dashboard_data = dashboard.get("dashboard", {})
+    
+    for p in dashboard_data.get("panels", []):
+        if p.get("id") == panel_id:
+            panel = p
+            break
+    
+    if not panel:
+        return {"error": f"패널 ID {panel_id}를 찾을 수 없습니다"}
+    
+    # 패널의 데이터소스와 쿼리 추출
+    datasource = panel.get("datasource")
+    targets = panel.get("targets", [])
+    
+    if not targets:
+        return {"error": "패널에 데이터 쿼리가 없습니다"}
+    
+    # 쿼리 요청 준비
+    url = f"{GRAFANA_URL}/api/ds/query"
+    
+    # 요청 데이터 구성
+    request_data = {
+        "queries": targets,
+        "from": time_range.get("from", "now-1h"),
+        "to": time_range.get("to", "now")
     }
     
-    headers = {
-        "Authorization": f"Bearer <GRAFANA_API_KEY"
+    try:
+        response = requests.post(url, json=request_data, headers=get_grafana_headers())
+        
+        if response.status_code == 200:
+            return response.json()
+        else:
+            logger.error(f"패널 데이터 쿼리 실패: HTTP {response.status_code}, {response.text}")
+            return {"error": f"패널 데이터 쿼리 실패: HTTP {response.status_code}"}
+    
+    except Exception as e:
+        logger.error(f"패널 데이터 쿼리 오류: {str(e)}")
+        return {"error": f"패널 데이터 쿼리 오류: {str(e)}"}
+
+# 스크린샷 도구
+
+@mcp.tool()
+def render_dashboard(dashboard_uid: str, time_range: Dict[str, str], width: int = 1000, height: int = 500, theme: str = "light") -> str:
+    """대시보드 이미지를 렌더링합니다.
+    
+    Args:
+        dashboard_uid: 대시보드 UID
+        time_range: 시간 범위 (딕셔너리 형태: {"from": "now-6h", "to": "now"} 등)
+        width: 이미지 너비 (픽셀)
+        height: 이미지 높이 (픽셀)
+        theme: 테마 ("light" 또는 "dark")
+        
+    Returns:
+        str: base64로 인코딩된 이미지 데이터
+    """
+    logger.info(f"render_dashboard 도구 호출: dashboard_uid={dashboard_uid}, time_range={time_range}")
+    
+    # 렌더링 URL 구성
+    url = f"{GRAFANA_URL}/render/d/{dashboard_uid}"
+    
+    params = {
+        "from": time_range.get("from", "now-1h"),
+        "to": time_range.get("to", "now"),
+        "width": width,
+        "height": height,
+        "theme": theme
     }
     
     try:
         # Grafana에 HTTP 요청
-        logger.info(f"Grafana 요청 전송: {url}")
-        response = requests.get(url, params=params, headers=headers)
+        logger.info(f"Grafana 렌더링 요청 전송: {url}")
+        response = requests.get(url, params=params, headers=get_grafana_headers())
         
         # 응답 확인
         if response.status_code == 200:
             # PNG 데이터를 Base64로 인코딩
             png_base64 = base64.b64encode(response.content).decode('utf-8')
-            
-            return {
-                "status": "success",
-                "message": message,
-                "timestamp": datetime.now().isoformat(),
-                "content_type": "image/png",
-                "data": png_base64,
-                "encoding": "base64"
-            }
+            return png_base64
         else:
-            logger.error(f"Grafana 요청 실패: HTTP {response.status_code}, {response.text}")
-            return {
-                "status": "error",
-                "message": f"Grafana 요청 실패: HTTP {response.status_code}",
-                "error_details": response.text
-            }
+            logger.error(f"대시보드 렌더링 실패: HTTP {response.status_code}, {response.text}")
+            return ""
     
     except Exception as e:
-        logger.error(f"대시보드 PNG 가져오기 오류: {str(e)}")
-        return {
-            "status": "error",
-            "message": f"대시보드 PNG 가져오기 오류: {str(e)}"
-        }
+        logger.error(f"대시보드 렌더링 오류: {str(e)}")
+        return ""
 
 @mcp.tool()
-def send_message(message: str, thread_id: Optional[str] = None) -> Dict[str, Any]:
-    """채팅 메시지를 전송하고 응답을 받습니다.
+def render_panel(dashboard_uid: str, panel_id: int, time_range: Dict[str, str], width: int = 500, height: int = 300, theme: str = "light") -> str:
+    """패널 이미지를 렌더링합니다.
     
     Args:
-        message: 사용자 메시지
-        thread_id: 대화 스레드 ID (없으면 새로 생성)
+        dashboard_uid: 대시보드 UID
+        panel_id: 패널 ID
+        time_range: 시간 범위 (딕셔너리 형태: {"from": "now-6h", "to": "now"} 등)
+        width: 이미지 너비 (픽셀)
+        height: 이미지 높이 (픽셀)
+        theme: 테마 ("light" 또는 "dark")
         
     Returns:
-        응답 메시지와 스레드 ID
+        str: base64로 인코딩된 이미지 데이터
     """
-    logger.info(f"send_message 도구 호출: 메시지='{message}', 스레드={thread_id}")
+    logger.info(f"render_panel 도구 호출: dashboard_uid={dashboard_uid}, panel_id={panel_id}, time_range={time_range}")
     
-    # 스레드 ID가 없으면 새로 생성
-    thread_id = thread_id or str(uuid.uuid4())
+    # 렌더링 URL 구성 (solo 모드로 패널만 렌더링)
+    url = f"{GRAFANA_URL}/render/d-solo/{dashboard_uid}"
     
-    # 스레드 정보 저장/업데이트
-    if thread_id not in threads:
-        threads[thread_id] = {
-            "created_at": datetime.now().isoformat(),
-            "metadata": {}
-        }
-    
-    # 메시지 ID 생성 및 저장
-    message_id = str(uuid.uuid4())
-    message_obj = {
-        "id": message_id,
-        "role": "user",
-        "content": message,
-        "created_at": datetime.now().isoformat()
+    params = {
+        "panelId": panel_id,
+        "from": time_range.get("from", "now-1h"),
+        "to": time_range.get("to", "now"),
+        "width": width,
+        "height": height,
+        "theme": theme
     }
     
-    if thread_id not in messages:
-        messages[thread_id] = []
-    
-    messages[thread_id].append(message_obj)
-    
-    # 응답 생성 (실제로는 LLM을 호출할 것)
-    response_options = [
-        "안녕하세요! 무엇을 도와드릴까요?",
-        "좋은 질문이네요. 더 자세히 알려주시겠어요?",
-        "흥미로운 주제입니다. 어떤 측면에 관심이 있으신가요?",
-        "도움이 필요하시면 언제든지 물어보세요!",
-        f"'{message}'에 대한 답변을 준비 중입니다..."
-    ]
-    
-    response_content = random.choice(response_options)
-    
-    # 응답 저장
-    response_obj = {
-        "id": str(uuid.uuid4()),
-        "role": "assistant",
-        "content": response_content,
-        "created_at": datetime.now().isoformat()
-    }
-    
-    messages[thread_id].append(response_obj)
-    
-    return {
-        "content": response_content,
-        "thread_id": thread_id
-    }
-
-@mcp.tool()
-def list_threads() -> Dict[str, List[Dict[str, Any]]]:
-    """모든 스레드 목록을 조회합니다.
-    
-    Returns:
-        모든 스레드 목록
-    """
-    logger.info("list_threads 도구 호출")
-    return {"threads": [{"thread_id": tid, **info} for tid, info in threads.items()]}
-
-@mcp.tool()
-def create_thread(metadata: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
-    """새 스레드를 생성합니다.
-    
-    Args:
-        metadata: 스레드 메타데이터(선택 사항)
+    try:
+        # Grafana에 HTTP 요청
+        logger.info(f"Grafana 패널 렌더링 요청 전송: {url}")
+        response = requests.get(url, params=params, headers=get_grafana_headers())
         
-    Returns:
-        생성된 스레드 정보
-    """
-    logger.info(f"create_thread 도구 호출: 메타데이터={metadata}")
+        # 응답 확인
+        if response.status_code == 200:
+            # PNG 데이터를 Base64로 인코딩
+            png_base64 = base64.b64encode(response.content).decode('utf-8')
+            return png_base64
+        else:
+            logger.error(f"패널 렌더링 실패: HTTP {response.status_code}, {response.text}")
+            return ""
     
-    thread_id = str(uuid.uuid4())
-    threads[thread_id] = {
-        "created_at": datetime.now().isoformat(),
-        "metadata": metadata or {}
-    }
-    messages[thread_id] = []
-    
-    return {
-        "thread_id": thread_id,
-        "created_at": threads[thread_id]["created_at"],
-        "metadata": threads[thread_id]["metadata"]
-    }
-
-@mcp.tool()
-def get_thread_messages(thread_id: str) -> Dict[str, List[Dict[str, Any]]]:
-    """특정 스레드의 메시지를 조회합니다.
-    
-    Args:
-        thread_id: 스레드 ID
-        
-    Returns:
-        해당 스레드의 메시지 목록
-    """
-    logger.info(f"get_thread_messages 도구 호출: 스레드={thread_id}")
-    
-    if thread_id not in threads:
-        return {"error": "스레드를 찾을 수 없습니다", "messages": []}
-    
-    return {"messages": messages.get(thread_id, [])}
-
-@mcp.tool()
-def execute_tool(tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
-    """도구를 실행합니다.
-    
-    Args:
-        tool_name: 실행할 도구 이름
-        parameters: 도구 파라미터
-        
-    Returns:
-        도구 실행 결과
-    """
-    logger.info(f"execute_tool 도구 호출: 도구={tool_name}, 파라미터={parameters}")
-    
-    # 실제 도구 실행 로직은 구현 예정
-    return {
-        "result": f"도구 '{tool_name}'가 파라미터 {parameters}로 실행되었습니다 (더미 응답)",
-        "status": "success"
-    }
+    except Exception as e:
+        logger.error(f"패널 렌더링 오류: {str(e)}")
+        return ""
 
 if __name__ == "__main__":
-    # HTTP 모드로 서버 실행 (포트 8000)
-    logger.info("MCP HTTP 서버 시작...")
+    # HTTP 모드로 서버 실행
+    logger.info("Grafana Dashboard MCP 서버 시작...")
     try:
-        # mcp.run 메서드는 'transport'만 인식하고 'port'를 직접 인자로 받지 않음
-        # 대신 'stdio' 또는 'sse' 전송 방식을 선택하고, 
-        # 'sse'의 경우에는 FastAPI/Uvicorn이 내부적으로 실행됨
-        # 참조: https://github.com/jlowin/fastmcp
+        # SSE 트랜스포트 모드로 실행 (FastAPI/Uvicorn 기반)
         mcp.run(transport="sse")
         
     except KeyboardInterrupt:

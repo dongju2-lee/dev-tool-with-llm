@@ -9,6 +9,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY . .
 
+# Default environment variables (can be overridden at runtime)
+ENV GRAFANA_URL=http://grafana:3000
+ENV GRAFANA_API_KEY=""
+
 # Expose port for HTTP/SSE MCP server
 EXPOSE 8000
 

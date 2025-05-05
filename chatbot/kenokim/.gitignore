@@ -1,0 +1,42 @@
+# 환경 변수 및 API 키
+.env
+
+# 가상 환경
+venv/
+env/
+ENV/
+.venv/
+
+# 파이썬 캐시 파일
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# 로그 파일
+*.log
+
+# 빌드 결과물
+dist/
+build/
+*.egg-info/
+
+# IDE 관련 파일
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# 운영체제 파일
+.DS_Store
+Thumbs.db
+
+# 개인 개발 파일 및 노트
+notes/
+*.bak
+tmp/
+
+# Streamlit 관련
+.streamlit/secrets.toml 

@@ -1,95 +1,189 @@
 """
-Dev Tool 관리 시스템 메인 애플리케이션
+메인 애플리케이션 모듈
+
+이 모듈은 FastAPI를 사용하여 챗봇 애플리케이션의 REST API를 정의합니다.
 """
 
-import streamlit as st
+import os
 import asyncio
-import nest_asyncio
-from typing import List, Dict, Any, Callable
+import time
+import json
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field
+from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
+from dotenv import load_dotenv
+from contextlib import asynccontextmanager
 
-# 비동기 중첩 실행 허용
-nest_asyncio.apply()
-
-# 페이지 임포트
-from page_list.chatbot_page import chatbot_page
-from page_list.rag_page import rag_page
-from page_list.helpers import CHATBOT_PAGE, RAG_PAGE
+from graph import DevToolGraph
 from utils.logger_config import setup_logger
-from config import *  # Import all constants and configuration values
+from config import *
 
-# 로거 설정'
-logger = setup_logger(__name__, level=LOG_LEVEL)
+# 환경 변수 로드
+load_dotenv()
 
-class MultiApp:
-    """여러 페이지를 관리하는 멀티앱 클래스"""
+# 로거 설정
+logger = setup_logger("app", level=LOG_LEVEL)
+
+# 그래프 인스턴스 생성
+graph_instance = DevToolGraph()
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """
+    애플리케이션 라이프사이클 관리
+    """
+    # 시작 시 실행
+    logger.info("애플리케이션 시작")
+    try:
+        # 그래프 초기 구축
+        await graph_instance.build()
+        logger.info("그래프 초기화 완료")
+    except Exception as e:
+        logger.error(f"시작 이벤트 처리 중 오류 발생: {str(e)}")
     
-    def __init__(self):
-        self.apps = []
+    yield
+    
+    # 종료 시 실행
+    logger.info("애플리케이션 종료")
 
-    def add_app(self, title, func):
-        """앱 페이지 추가"""
-        self.apps.append({
-            "title": title,
-            "function": func
-        })
+# FastAPI 앱 생성
+app = FastAPI(
+    title="개발 도구 챗봇 API",
+    description="다양한 개발 도구 에이전트를 통합한 다중 에이전트 챗봇 API",
+    version="0.1.0",
+    lifespan=lifespan
+)
 
-    def run(self):
-        """멀티앱 실행"""
-        # 페이지 설정
-        st.set_page_config(
-            page_title="Dev Tool 매니저",
-            page_icon="🏠",
-            layout="wide",
-            initial_sidebar_state="expanded"
+# CORS 설정
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# 요청/응답 모델 정의
+class ChatMessage(BaseModel):
+    """채팅 메시지 모델"""
+    role: str = Field(..., description="메시지 발신자의 역할 (user 또는 assistant)")
+    content: str = Field(..., description="메시지 내용")
+    name: Optional[str] = Field(None, description="메시지 발신자의 이름 (선택 사항)")
+    
+class ChatRequest(BaseModel):
+    """채팅 요청 모델"""
+    message: str = Field(..., description="사용자 입력 메시지")
+    conversation_id: Optional[str] = Field(None, description="대화 ID (선택 사항)")
+    
+class ChatResponse(BaseModel):
+    """채팅 응답 모델"""
+    conversation_id: str = Field(..., description="대화 ID")
+    messages: List[ChatMessage] = Field(default_factory=list, description="응답 메시지 목록")
+    created_at: float = Field(..., description="응답 생성 시간 (유닉스 타임스탬프)")
+
+
+@app.get("/")
+async def root():
+    """
+    애플리케이션 상태를 확인하는 엔드포인트
+    """
+    return {"status": "online", "service": "dev-tool-chatbot"}
+
+
+@app.get("/status")
+async def status():
+    """
+    애플리케이션 상태 정보를 제공하는 엔드포인트
+    """
+    return {
+        "status": "online",
+        "service": "dev-tool-chatbot",
+        "version": "0.1.0",
+        "timestamp": time.time()
+    }
+
+
+@app.post("/chat", response_model=ChatResponse)
+async def chat(request: ChatRequest):
+    """
+    채팅 메시지를 처리하는 엔드포인트
+    
+    Args:
+        request: 채팅 요청 객체
+        
+    Returns:
+        채팅 응답 객체
+    """
+    try:
+        logger.info(f"채팅 요청 수신: '{request.message[:50]}...'")
+        start_time = time.time()
+        
+        # 그래프 호출
+        responses = await graph_instance.invoke(request.message)
+        
+        # 응답 변환
+        chat_messages = []
+        for msg in responses:
+            role = "assistant"
+            if hasattr(msg, "name") and msg.name:
+                name = msg.name
+            else:
+                name = None
+                
+            chat_messages.append(
+                ChatMessage(
+                    role=role,
+                    content=msg.content,
+                    name=name
+                )
+            )
+        
+        # 응답 생성
+        conversation_id = request.conversation_id or f"conv_{int(time.time())}"
+        response = ChatResponse(
+            conversation_id=conversation_id,
+            messages=chat_messages,
+            created_at=time.time()
         )
         
-        # 사이드바 설정
-        with st.sidebar:
-            st.title("Dev Tool 매니저 🏠")
-            st.markdown("## 메인 메뉴")
-            
-            # 페이지 선택 셀렉트박스
-            selected_app = st.selectbox(
-                "페이지 선택", 
-                self.apps, 
-                format_func=lambda app: app["title"]
-            )
-            
-            st.markdown("---")
-            
-            # 설정 섹션
-            st.subheader("설정")
-            
-            # 챗봇 페이지일 때만 스트리밍 모드와 지연 시간 설정 표시
-            if selected_app["title"] == CHATBOT_PAGE:
-                # 스트리밍 모드 설정
-                streaming_mode = st.checkbox("응답 스트리밍 모드", 
-                                           value=st.session_state.get("streaming_mode", True))
-                if "streaming_mode" not in st.session_state or st.session_state.streaming_mode != streaming_mode:
-                    st.session_state.streaming_mode = streaming_mode
-                
-                # 스트리밍 지연 시간 설정
-                if streaming_mode:
-                    word_delay = st.slider("단어 지연 시간 (초)", 
-                                          min_value=0.0, max_value=0.1, value=st.session_state.get("word_delay", 0.01), 
-                                          step=0.01, format="%.2f")
-                    if "word_delay" not in st.session_state or st.session_state.word_delay != word_delay:
-                        st.session_state.word_delay = word_delay
-            else:
-                # 챗봇 페이지가 아닌 경우 일반 설정 정보 표시
-                st.info("페이지별 설정은 해당 페이지에서 확인하실 수 있습니다.")
+        elapsed_time = time.time() - start_time
+        logger.info(f"채팅 응답 생성 완료. 소요 시간: {elapsed_time:.2f}초")
         
-        # 선택한 앱 실행
-        selected_app["function"]()
+        return response
+        
+    except Exception as e:
+        logger.error(f"채팅 처리 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"채팅 처리 중 오류 발생: {str(e)}")
 
-# 메인 실행 코드
+
+@app.post("/reset")
+async def reset_conversation():
+    """
+    대화 상태를 재설정하는 엔드포인트
+    """
+    try:
+        logger.info("대화 상태 재설정 요청")
+        
+        # 그래프 상태 재설정
+        graph_instance.reset_state()
+        
+        return {"status": "success", "message": "대화 상태가 재설정되었습니다."}
+        
+    except Exception as e:
+        logger.error(f"대화 상태 재설정 중 오류 발생: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"대화 상태 재설정 중 오류 발생: {str(e)}")
+
+
 if __name__ == "__main__":
-    # 멀티앱 인스턴스 생성
-    app = MultiApp()
+    import uvicorn
     
-    # 앱 등록
-    app.add_app(CHATBOT_PAGE, chatbot_page)
-    app.add_app(RAG_PAGE, rag_page)
-    
-    # 앱 실행
-    app.run() 
+    # Uvicorn 서버 시작 - 포트 8001로 변경
+    port = int(os.environ.get("PORT", 8001))
+    uvicorn.run(
+        "app:app",
+        host="0.0.0.0",
+        port=port,
+        reload=True
+    ) 

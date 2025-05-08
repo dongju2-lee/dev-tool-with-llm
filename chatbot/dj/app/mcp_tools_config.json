@@ -1,6 +1,6 @@
 {
-  "milvus_service": {
-    "url": "http://0.0.0.0:8012/sse",
+  "k6_service": {
+    "url": "http://0.0.0.0:10001/sse",
     "transport": "sse"
   }
 }

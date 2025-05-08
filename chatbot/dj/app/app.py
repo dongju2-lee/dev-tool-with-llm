@@ -180,7 +180,7 @@ if __name__ == "__main__":
     import uvicorn
     
     # Uvicorn 서버 시작 - 포트 8001로 변경
-    port = int(os.environ.get("PORT", 8001))
+    port = int(os.environ.get("PORT", 8051))
     uvicorn.run(
         "app:app",
         host="0.0.0.0",

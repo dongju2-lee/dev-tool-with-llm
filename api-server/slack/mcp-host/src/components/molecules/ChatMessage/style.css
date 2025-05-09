@@ -1,0 +1,39 @@
+.llm-think-block {
+    background-color: #f5f5f5;
+    border-left: 4px solid #888;
+    padding: 1rem;
+    margin: 1rem 0;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+  }
+  
+  .llm-think-label {
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+    color: #555;
+  }
+  
+  .llm-think-content {
+    white-space: pre-wrap;
+    line-height: 1.5;
+  }
+
+@keyframes loadingDots {
+  0%, 20% {
+    content: '.';
+  }
+  40% {
+    content: '.';
+  }
+  60% {
+    content: '..';
+  }
+  80%, 100% {
+    content: '...';
+  }
+}
+
+.loading-dots::after {
+  content: '';
+  animation: loadingDots 1.5s infinite;
+}

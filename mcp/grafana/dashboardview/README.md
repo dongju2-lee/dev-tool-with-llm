@@ -2,7 +2,13 @@
 
 Grafana 대시보드 API를 LLM이 활용할 수 있도록 만든 MCP(Model Context Protocol) 서버입니다.
 
+## 기능 목록
+- 데이터소스 목록 조회
+- 대시보드 목록 조회 (Dashboard folder 에 있는 목록)
+
 ## 실행 방법
+
+- Grafana renderer 가 떠 있어야 작동합니다.
 
 ### 환경 변수 설정
 `.env` 파일을 생성하고 다음 내용을 추가하세요:

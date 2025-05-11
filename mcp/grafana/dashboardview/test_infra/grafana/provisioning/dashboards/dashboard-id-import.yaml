@@ -3,7 +3,7 @@ apiVersion: 1
 providers:
   - name: 'Spring Boot ID Dashboard'
     orgId: 1
-    folder: 'Spring Boot'
+    folder: 'Spring Boot Templates'
     type: file
     disableDeletion: false
     allowUiUpdates: true

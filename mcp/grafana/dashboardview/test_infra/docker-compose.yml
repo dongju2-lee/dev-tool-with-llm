@@ -23,6 +23,33 @@ services:
     depends_on:
       - target-api
 
+  # Loki 서비스 추가
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+      - ./grafana/loki/local-config.yaml:/etc/loki/local-config.yaml
+      - loki-data:/loki
+    networks:
+      - monitoring-network
+
+  # Tempo 서비스 추가
+  tempo:
+    image: grafana/tempo:latest
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    user: "0:0"  # root 권한으로 실행하여 권한 문제 해결
+    volumes:
+      - ./grafana/tempo/tempo.yaml:/etc/tempo.yaml
+      - tempo-data:/tmp/tempo
+    ports:
+      - "3200:3200"   # tempo
+      - "4317:4317"   # otlp grpc
+      - "4318:4318"   # otlp http
+    networks:
+      - monitoring-network
+
   grafana:
     image: grafana/grafana:latest
     ports:
@@ -47,6 +74,8 @@ services:
     depends_on:
       - prometheus
       - renderer
+      - loki
+      - tempo
 
   # 이미지 렌더러 서비스 추가
   renderer:
@@ -80,3 +109,7 @@ networks:
 
 volumes:
   grafana-storage: 
+  loki-data:
+    driver: local
+  tempo-data: 
+    driver: local

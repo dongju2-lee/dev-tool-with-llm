@@ -1,0 +1,75 @@
+# Python 가상환경
+venv/
+env/
+ENV/
+.venv/
+.env/
+.ENV/
+**/venv/
+**/env/
+**/ENV/
+**/.venv/
+**/.env/
+**/.ENV/
+
+# 환경 변수 파일
+.env
+**/.env
+.env.local
+**/.env.local
+.env.development
+**/.env.development
+.env.test
+**/.env.test
+.env.production
+**/.env.production
+
+# Python 관련 파일
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# 로그 파일
+*.log
+logs/
+**/logs/
+
+# IDE 관련 파일
+.idea/
+.vscode/
+*.sublime-workspace
+*.sublime-project
+.project
+.pydevproject
+.settings/
+
+# OS 관련 파일
+.DS_Store
+Thumbs.db
+.directory
+*.swp
+*.swo
+
+# 임시 파일
+*.tmp
+*.bak
+*.backup
+*~ 

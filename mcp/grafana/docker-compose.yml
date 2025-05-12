@@ -1,0 +1,23 @@
+version: "3.9"
+
+services:
+  # Grafana Renderer MCP (새로 개발)
+  grafana-renderer-mcp:
+    build:
+      context: ./dashboardview
+    environment:
+      GRAFANA_URL: http://host.docker.internal:3000
+      GRAFANA_API_KEY: ${GRAFANA_API_KEY:-}
+    ports:
+      - "8090:8000"
+    restart: unless-stopped
+  
+  # Grafana MCP (공식)
+  grafana-mcp:
+    image: mcp/grafana:latest
+    environment:
+      GRAFANA_URL: http://host.docker.internal:3000
+      GRAFANA_API_KEY: ${GRAFANA_API_KEY:-}
+    ports:
+      - "8091:8000"
+    restart: unless-stopped

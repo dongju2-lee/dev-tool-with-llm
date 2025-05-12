@@ -1,0 +1,32 @@
+{
+  "annotations": {
+    "list": []
+  },
+  "editable": true,
+  "fiscalYearStartMonth": 0,
+  "graphTooltip": 0,
+  "id": 19004,
+  "links": [],
+  "liveNow": false,
+  "panels": [],
+  "refresh": "5s",
+  "schemaVersion": 38,
+  "style": "dark",
+  "tags": [
+    "jvm",
+    "spring boot"
+  ],
+  "templating": {
+    "list": []
+  },
+  "time": {
+    "from": "now-15m",
+    "to": "now"
+  },
+  "timepicker": {},
+  "timezone": "",
+  "title": "Spring Boot 3.0 Statistics",
+  "uid": "spring-boot-statistics",
+  "version": 1,
+  "weekStart": ""
+} 

@@ -26,7 +26,7 @@ gemini_model = ChatGoogleGenerativeAI(
 @asynccontextmanager
 async def make_graph(
     client_name="mcp-server-test", 
-    url="http://localhost:8000/sse", 
+    url="http://host.docker.internal:8090/sse", 
     transport="sse"
 ):
     """Creates a ReAct agent with the Gemini model and MCP tools if available

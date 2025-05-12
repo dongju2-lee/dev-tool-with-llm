@@ -29,16 +29,3 @@ services:
     environment:
       - PYTHONPATH=/app:/app/parent
     restart: unless-stopped
-    depends_on:
-      - mcp-server
-
-  # MCP 서버 서비스
-  mcp-server:
-    build:
-      context: ./mcp-server
-      dockerfile: Dockerfile
-    ports:
-      - "8002:8000"  # 호스트 8002 포트로 매핑 (백엔드가 8000 사용)
-    volumes:
-      - ./mcp-server:/app
-    restart: unless-stopped 

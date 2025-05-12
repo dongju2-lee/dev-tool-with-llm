@@ -27,7 +27,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # 기본 MCP 서버 URL 설정 (Docker Compose에서 덮어씌울 수 있음)
-ENV MCP_SERVER_URL="http://mcp-server:8000/sse"
+ENV MCP_SERVER_URL="http://host.docker.internal:8090/sse"
 ENV MCP_CLIENT_NAME="backend-client"
 ENV MCP_TRANSPORT="sse"
 

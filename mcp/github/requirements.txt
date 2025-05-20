@@ -1,0 +1,3 @@
+python-dotenv==1.0.0
+mcp==1.8.1
+requests

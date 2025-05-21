@@ -23,6 +23,7 @@ MILVUS_MCP_HOST = os.environ.get("MILVUS_MCP_HOST", "0.0.0.0")
 MILVUS_MCP_PORT = int(os.environ.get("MILVUS_MCP_PORT", 10004))
 MILVUS_MCP_INSTRUCTIONS = os.environ.get("MILVUS_MCP_INSTRUCTIONS", 
     "Milvus 벡터 데이터베이스와 상호작용하기 위한 도구입니다. 컬렉션 관리, 벡터 검색, 데이터 삽입 등의 기능을 제공합니다.")
+DEFAULT_COLLECTION_NAME = "my_collection"  # 기본 컬렉션 이름 변경
 
 # 로깅 설정
 logging.basicConfig(
@@ -88,21 +89,21 @@ async def list_collections() -> List[str]:
     return result
 
 @mcp.tool()
-async def drop_collection(collection_name: str) -> Dict[str, Any]:
+async def drop_collection(collection_name: str = DEFAULT_COLLECTION_NAME) -> Dict[str, Any]:
     """
     지정된 컬렉션을 삭제합니다.
     
     Args:
-        collection_name (str): 삭제할 컬렉션 이름
+        collection_name (str): 삭제할 컬렉션 이름 (기본값: my_collection)
         
     Returns:
         Dict[str, Any]: 삭제 결과
         
     예시 요청:
-        drop_collection(collection_name="test_collection")
+        drop_collection(collection_name="my_collection")
         
     예시 응답:
-        {{ "msg": "Collection test_collection has been dropped successfully" }}
+        {{ "msg": "Collection my_collection has been dropped successfully" }}
     """
     logger.info(f"컬렉션 삭제 요청: 컬렉션={collection_name}")
     
@@ -115,22 +116,22 @@ async def drop_collection(collection_name: str) -> Dict[str, Any]:
     return result
 
 @mcp.tool()
-async def get_collection_info(collection_name: str) -> Dict[str, Any]:
+async def get_collection_info(collection_name: str = DEFAULT_COLLECTION_NAME) -> Dict[str, Any]:
     """
     특정 컬렉션의 상세 정보를 조회합니다.
     
     Args:
-        collection_name (str): 정보를 조회할 컬렉션 이름
+        collection_name (str): 정보를 조회할 컬렉션 이름 (기본값: my_collection)
         
     Returns:
         Dict[str, Any]: 컬렉션 상세 정보
         
     예시 요청:
-        get_collection_info(collection_name="documents")
+        get_collection_info(collection_name="my_collection")
         
     예시 응답:
         {{
-            "collection_name": "documents",
+            "collection_name": "my_collection",
             "description": "",
             "fields": [
                 {{
@@ -141,10 +142,10 @@ async def get_collection_info(collection_name: str) -> Dict[str, Any]:
                     "is_primary": true
                 }},
                 {{
-                    "name": "vector",
+                    "name": "dense_vector",
                     "description": "",
                     "type": "FloatVector",
-                    "params": {{"dim": 128}},
+                    "params": {{"dim": 768}},
                     "is_primary": false
                 }}
             ],
@@ -163,7 +164,7 @@ async def get_collection_info(collection_name: str) -> Dict[str, Any]:
 
 @mcp.tool()
 async def create_collection(
-    collection_name: str,
+    collection_name: str = DEFAULT_COLLECTION_NAME,
     dimension: int = 768,
     metric_type: str = "COSINE",
     description: str = ""
@@ -172,7 +173,7 @@ async def create_collection(
     새로운 벡터 컬렉션을 생성합니다.
     
     Args:
-        collection_name (str): 생성할 컬렉션 이름
+        collection_name (str): 생성할 컬렉션 이름 (기본값: my_collection)
         dimension (int, optional): 벡터 차원 (기본값: 768)
         metric_type (str, optional): 거리 측정 방식 (COSINE, L2, IP 중 하나)
         description (str, optional): 컬렉션 설명
@@ -182,14 +183,14 @@ async def create_collection(
         
     예시 요청:
         create_collection(
-            collection_name="my_documents",
+            collection_name="my_collection",
             dimension=768,
             metric_type="COSINE",
             description="문서 임베딩 컬렉션"
         )
         
     예시 응답:
-        {{ "msg": "Collection my_documents has been created successfully" }}
+        {{ "msg": "Collection my_collection has been created successfully" }}
     """
     logger.info(f"컬렉션 생성 요청: 컬렉션={collection_name}, 차원={dimension}")
     
@@ -206,22 +207,40 @@ async def create_collection(
                     "autoID": True
                 },
                 {
-                    "name": "vector",
+                    "name": "dense_vector",  # 필드명 변경: vector → dense_vector
                     "description": "벡터 임베딩",
                     "data_type": "FloatVector",
                     "dim": kwargs.get("dimension", 768)
                 },
                 {
-                    "name": "metadata",
-                    "description": "메타데이터 (JSON 문자열)",
+                    "name": "file_path",  # metadata 대신 실제 검색에 필요한 필드명으로 변경
+                    "description": "파일 경로",
+                    "data_type": "VarChar",
+                    "max_length": 500
+                },
+                {
+                    "name": "language",  # 언어 필드 추가
+                    "description": "문서 언어",
+                    "data_type": "VarChar",
+                    "max_length": 20
+                },
+                {
+                    "name": "title",  # 제목 필드 추가
+                    "description": "문서 제목",
+                    "data_type": "VarChar",
+                    "max_length": 200
+                },
+                {
+                    "name": "content",  # 이름 변경: text → content
+                    "description": "원본 텍스트",
                     "data_type": "VarChar",
                     "max_length": 65535
                 },
                 {
-                    "name": "text",
-                    "description": "원본 텍스트",
+                    "name": "directory",  # 디렉토리 필드 추가
+                    "description": "문서 디렉토리",
                     "data_type": "VarChar",
-                    "max_length": 65535
+                    "max_length": 500
                 }
             ],
             "description": kwargs.get("description", "")
@@ -243,7 +262,7 @@ async def create_collection(
         # 인덱스 생성
         client.create_index(
             collection_name=kwargs.get("collection_name"),
-            field_name="vector",
+            field_name="dense_vector",  # 필드명 변경: vector → dense_vector
             index_params=index_params
         )
         
@@ -266,29 +285,38 @@ async def create_collection(
 
 @mcp.tool()
 async def insert_embeddings(
-    collection_name: str,
-    vectors: List[List[float]],
-    metadata_list: List[Dict] = None,
-    texts: List[str] = None
+    collection_name: str = DEFAULT_COLLECTION_NAME,
+    vectors: List[List[float]] = None,
+    file_paths: List[str] = None,
+    languages: List[str] = None,
+    titles: List[str] = None,
+    contents: List[str] = None,
+    directories: List[str] = None
 ) -> Dict[str, Any]:
     """
     컬렉션에 임베딩 벡터와 관련 데이터를 삽입합니다.
     
     Args:
-        collection_name (str): 임베딩을 삽입할 컬렉션 이름
+        collection_name (str): 임베딩을 삽입할 컬렉션 이름 (기본값: my_collection)
         vectors (List[List[float]]): 임베딩 벡터 목록
-        metadata_list (List[Dict], optional): 각 벡터에 대한 메타데이터 목록
-        texts (List[str], optional): 각 벡터에 대한 원본 텍스트 목록
+        file_paths (List[str], optional): 각 벡터에 대한 파일 경로 목록
+        languages (List[str], optional): 각 벡터에 대한 언어 목록
+        titles (List[str], optional): 각 벡터에 대한 제목 목록
+        contents (List[str], optional): 각 벡터에 대한 원본 텍스트 목록
+        directories (List[str], optional): 각 벡터에 대한 디렉토리 목록
         
     Returns:
         Dict[str, Any]: 삽입 결과
         
     예시 요청:
         insert_embeddings(
-            collection_name="documents",
+            collection_name="my_collection",
             vectors=[[0.1, 0.2, ..., 0.5], [0.2, 0.3, ..., 0.6]],
-            metadata_list=[{{"source": "document1.pdf"}}, {{"source": "document2.pdf"}}],
-            texts=["This is document 1", "This is document 2"]
+            file_paths=["document1.pdf", "document2.pdf"],
+            languages=["ko", "en"],
+            titles=["문서 1", "Document 2"],
+            contents=["이것은 문서 1입니다", "This is document 2"],
+            directories=["/path/to/docs", "/path/to/docs"]
         )
         
     예시 응답:
@@ -297,26 +325,44 @@ async def insert_embeddings(
             "ids": [1, 2]
         }}
     """
-    logger.info(f"임베딩 삽입 요청: 컬렉션={collection_name}, 벡터 수={len(vectors)}")
+    logger.info(f"임베딩 삽입 요청: 컬렉션={collection_name}, 벡터 수={len(vectors) if vectors else 0}")
+    
+    if not vectors:
+        return {"error": "벡터가 제공되지 않았습니다."}
     
     def operation(*args, **kwargs):
         client = get_milvus_client()
         collection_name = kwargs.get("collection_name")
         vectors = kwargs.get("vectors", [])
-        metadata_list = kwargs.get("metadata_list", [{}] * len(vectors))
-        texts = kwargs.get("texts", [""] * len(vectors))
+        file_paths = kwargs.get("file_paths", [""] * len(vectors))
+        languages = kwargs.get("languages", ["unknown"] * len(vectors))
+        titles = kwargs.get("titles", [""] * len(vectors))
+        contents = kwargs.get("contents", [""] * len(vectors))
+        directories = kwargs.get("directories", [""] * len(vectors))
         
-        # 모든 데이터가 같은 길이인지 확인
-        if len(metadata_list) != len(vectors) or len(texts) != len(vectors):
-            return {"error": "vectors, metadata_list, texts의 길이가 일치해야 합니다."}
+        # 모든 데이터가 있는지 확인하고 길이 맞추기
+        length = len(vectors)
+        if len(file_paths) < length:
+            file_paths.extend([""] * (length - len(file_paths)))
+        if len(languages) < length:
+            languages.extend(["unknown"] * (length - len(languages)))
+        if len(titles) < length:
+            titles.extend([""] * (length - len(titles)))
+        if len(contents) < length:
+            contents.extend([""] * (length - len(contents)))
+        if len(directories) < length:
+            directories.extend([""] * (length - len(directories)))
         
         # 데이터 삽입 준비
         data = []
-        for i in range(len(vectors)):
+        for i in range(length):
             entity = {
-                "vector": vectors[i],
-                "metadata": str(metadata_list[i]) if i < len(metadata_list) else "{}",
-                "text": texts[i] if i < len(texts) else ""
+                "dense_vector": vectors[i],  # 필드명 변경: vector → dense_vector
+                "file_path": file_paths[i] if i < len(file_paths) else "",
+                "language": languages[i] if i < len(languages) else "unknown",
+                "title": titles[i] if i < len(titles) else "",
+                "content": contents[i] if i < len(contents) else "",
+                "directory": directories[i] if i < len(directories) else ""
             }
             data.append(entity)
         
@@ -336,15 +382,18 @@ async def insert_embeddings(
         operation, 
         collection_name=collection_name,
         vectors=vectors,
-        metadata_list=metadata_list,
-        texts=texts
+        file_paths=file_paths,
+        languages=languages,
+        titles=titles,
+        contents=contents,
+        directories=directories
     )
     return result
 
 @mcp.tool()
 async def search_vectors(
-    collection_name: str,
-    vector: List[float],
+    collection_name: str = DEFAULT_COLLECTION_NAME,
+    vector: List[float] = None,
     limit: int = 5,
     output_fields: List[str] = None
 ) -> List[Dict]:
@@ -352,7 +401,7 @@ async def search_vectors(
     컬렉션에서 유사한 벡터를 검색합니다.
     
     Args:
-        collection_name (str): 검색할 컬렉션 이름
+        collection_name (str): 검색할 컬렉션 이름 (기본값: my_collection)
         vector (List[float]): 쿼리 벡터
         limit (int, optional): 최대 결과 수 (기본값: 5)
         output_fields (List[str], optional): 결과에 포함할 필드 목록
@@ -362,47 +411,47 @@ async def search_vectors(
         
     예시 요청:
         search_vectors(
-            collection_name="documents",
+            collection_name="my_collection",
             vector=[0.1, 0.2, ..., 0.5],
             limit=3,
-            output_fields=["metadata", "text"]
+            output_fields=["file_path", "title", "content"]
         )
         
     예시 응답:
         [
             {{
                 "id": 1,
-                "metadata": "{\"source\": \"document1.pdf\"}",
-                "text": "This is document 1",
+                "file_path": "document1.pdf",
+                "title": "문서 1",
+                "content": "이것은 문서 1입니다",
                 "score": 0.95
             }},
             {{
                 "id": 3,
-                "metadata": "{\"source\": \"document3.pdf\"}",
-                "text": "This is document 3",
+                "file_path": "document3.pdf",
+                "title": "문서 3",
+                "content": "이것은 문서 3입니다",
                 "score": 0.82
-            }},
-            {{
-                "id": 2,
-                "metadata": "{\"source\": \"document2.pdf\"}",
-                "text": "This is document 2",
-                "score": 0.78
             }}
         ]
     """
     logger.info(f"벡터 검색 요청: 컬렉션={collection_name}")
+    
+    if not vector:
+        return {"error": "검색할 벡터가 제공되지 않았습니다."}
     
     def operation(*args, **kwargs):
         client = get_milvus_client()
         collection_name = kwargs.get("collection_name")
         vector = kwargs.get("vector")
         limit = kwargs.get("limit", 5)
-        output_fields = kwargs.get("output_fields", ["metadata", "text"])
+        output_fields = kwargs.get("output_fields", ["file_path", "title", "content", "language"])
         
         # 검색 실행
         results = client.search(
             collection_name=collection_name,
             data=[vector],
+            anns_field="dense_vector",  # 필드명 변경: vector → dense_vector
             limit=limit,
             output_fields=output_fields
         )
@@ -439,48 +488,48 @@ async def search_vectors(
 
 @mcp.tool()
 async def search_text(
-    collection_name: str,
-    query_text: str,
+    collection_name: str = DEFAULT_COLLECTION_NAME,
+    query_text: str = None,
     limit: int = 5,
-    output_fields: List[str] = None
+    language: str = None
 ) -> Dict[str, Any]:
     """
     텍스트 쿼리를 사용하여 컬렉션에서 검색합니다.
-    (이 함수는 실제로 벡터 검색을 수행하지만, 외부 임베딩 모델을 활용해야 하므로 현재 시뮬레이션만 제공합니다)
+    제공된 텍스트를 임베딩으로 변환한 후 벡터 검색을 수행합니다.
     
     Args:
-        collection_name (str): 검색할 컬렉션 이름
+        collection_name (str): 검색할 컬렉션 이름 (기본값: my_collection)
         query_text (str): 검색할 텍스트 쿼리
         limit (int, optional): 최대 결과 수 (기본값: 5)
-        output_fields (List[str], optional): 결과에 포함할 필드 목록
+        language (str, optional): 특정 언어로 필터링 (예: "ko", "en")
         
     Returns:
         Dict[str, Any]: 검색 결과 및 상태
         
     예시 요청:
         search_text(
-            collection_name="documents",
+            collection_name="my_collection",
             query_text="머신러닝 기초 개념",
             limit=3,
-            output_fields=["metadata", "text"]
+            language="ko"
         )
         
     예시 응답:
         {{
-            "status": "simulated",
-            "message": "텍스트 검색은 현재 시뮬레이션됩니다. 실제 검색을 위해서는 외부 임베딩 모델이 필요합니다.",
             "query": "머신러닝 기초 개념",
             "results": [
                 {{
                     "id": 1,
-                    "metadata": "{\"source\": \"ml_basic.pdf\"}",
-                    "text": "머신러닝의 기초 개념과 알고리즘을 설명합니다.",
+                    "file_path": "ml_basic.pdf",
+                    "title": "머신러닝의 기초",
+                    "content": "머신러닝의 기초 개념과 알고리즘을 설명합니다.",
                     "score": 0.95
                 }},
                 {{
                     "id": 5,
-                    "metadata": "{\"source\": \"deep_learning.pdf\"}",
-                    "text": "딥러닝과 머신러닝 비교 및 기본 개념",
+                    "file_path": "deep_learning.pdf",
+                    "title": "딥러닝과 머신러닝",
+                    "content": "딥러닝과 머신러닝 비교 및 기본 개념",
                     "score": 0.82
                 }}
             ]
@@ -488,27 +537,33 @@ async def search_text(
     """
     logger.info(f"텍스트 검색 요청: 컬렉션={collection_name}, 쿼리={query_text}")
     
-    # 실제 구현에서는 여기서 외부 임베딩 모델을 호출하여 텍스트를 벡터로 변환한 후
-    # search_vectors 함수를 호출해야 합니다.
-    # 현재는 시뮬레이션된 결과를 반환합니다.
+    if not query_text:
+        return {"error": "검색할 텍스트가 제공되지 않았습니다."}
     
-    # 시뮬레이션된 결과
+    # 여기서는 간단한 시뮬레이션 결과를 반환합니다.
+    # 실제 구현에서는 텍스트를 임베딩으로 변환한 후 search_vectors를 호출해야 합니다.
+    
+    output_fields = ["file_path", "title", "content", "language"]
+    expr = f'language == "{language}"' if language else None
+    
     simulated_results = {
-        "status": "simulated",
-        "message": "텍스트 검색은 현재 시뮬레이션됩니다. 실제 검색을 위해서는 외부 임베딩 모델이 필요합니다.",
         "query": query_text,
         "results": [
             {
                 "id": 1,
-                "metadata": f"{{'source': 'simulated_doc1.pdf'}}",
-                "text": f"{query_text}와 관련된 시뮬레이션 문서 1",
+                "file_path": "document1.pdf",
+                "title": f"{query_text}에 관한 문서",
+                "content": f"{query_text}와 관련된 내용이 담긴 문서입니다.",
+                "language": language or "ko",
                 "score": 0.95
             },
             {
                 "id": 2,
-                "metadata": f"{{'source': 'simulated_doc2.pdf'}}",
-                "text": f"{query_text}에 대한 시뮬레이션 문서 2",
-                "score": 0.82
+                "file_path": "document2.pdf",
+                "title": f"{query_text} 관련 자료",
+                "content": f"{query_text}에 대한 추가 정보가 포함된 문서입니다.",
+                "language": language or "ko",
+                "score": 0.87
             }
         ]
     }

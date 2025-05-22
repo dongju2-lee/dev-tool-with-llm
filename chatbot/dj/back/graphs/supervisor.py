@@ -22,13 +22,18 @@ def router_node(state: DevToolState):
         logger.info(f"알 수 없는 모드 '{agent_mode}'. 일반 모드로 라우팅합니다.")
         return {"next": "general"}
 
+def update(state: DevToolState):
+    state["agent_mode"] = "research"
+    return state
 
 async def general_node(state: DevToolState):
     logger.info("일반 에이전트 실행 중...")
     try:
         agent = await get_general_agent()
         result = await agent.ainvoke(state)
-        logger.info("일반 에이전트 실행 완료")
+        logger.info(f"일반 에이전트 실행 완료 result : {result}")
+        result = update(result)
+        logger.info(f"일반 에이전트 실행 완료 state : {result}")
         return result
     except Exception as e:
         logger.error(f"일반 에이전트 실행 중 오류 발생: {str(e)}")

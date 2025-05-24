@@ -1,0 +1,2 @@
+streamlit
+nest_asyncio

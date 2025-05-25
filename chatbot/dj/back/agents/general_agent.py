@@ -26,24 +26,24 @@ langfuse_handler = CallbackHandler(public_key="", secret_key="", host="")
 
 # MCP 서버 URL 설정
 MCP_SERVERS = {
-    "github": {
-        "url": os.environ.get(
-            "REFRIGERATOR_MCP_URL", "http://localhost:10005/sse"
-        ),
-        "transport": "sse",
-    },
+    # "github": {
+    #     "url": os.environ.get(
+    #         "REFRIGERATOR_MCP_URL", "http://localhost:10005/sse"
+    #     ),
+    #     "transport": "sse",
+    # },
     "milvus": {
         "url": os.environ.get(
             "REFRIGERATOR_MCP_URL", "http://localhost:10004/sse"
         ),
         "transport": "sse",
     },
-    "k6": {
-        "url": os.environ.get(
-            "REFRIGERATOR_MCP_URL", "http://localhost:10003/sse"
-        ),
-        "transport": "sse",
-    }
+    # "k6": {
+    #     "url": os.environ.get(
+    #         "REFRIGERATOR_MCP_URL", "http://localhost:10003/sse"
+    #     ),
+    #     "transport": "sse",
+    # }
 }
 
 
@@ -114,7 +114,6 @@ async def convert_mcp_tools_to_info() -> List[Dict[str, Any]]:
     return tools_info
 
 
-# LLM 모델 초기화 함수
 async def get_llm():
     """LLM 모델을 초기화하고 반환합니다."""
 
@@ -128,14 +127,12 @@ async def get_llm():
     global _llm_instance
     if _llm_instance is None:
         model_name = os.environ.get("VERTEX_MODEL", "gemini-2.0-flash")
-        logger.info(f"LLM 모델 초기화: {model_name}")
+        print(f"LLM 모델 초기화: {model_name}")
         _llm_instance = ChatVertexAI(
             model=model_name, temperature=0.1, max_output_tokens=8190
         )
     return _llm_instance
 
-
-# 프롬프트 생성 함수
 async def generate_prompt() -> str:
     """사용자 요청에 따른 프롬프트를 생성합니다."""
     try:
@@ -151,35 +148,18 @@ async def generate_prompt() -> str:
                 "현재 사용 가능한 도구가 없습니다. MCP 서버 연결을 확인하세요."
             )
     except Exception as e:
-        logger.info(f"도구 정보 가져오기 중 오류 발생: {str(e)}")
+        print(f"도구 정보 가져오기 중 오류 발생: {str(e)}")
         tools_text = "도구 정보를 가져오는 중 오류가 발생했습니다. MCP 서버 연결을 확인하세요."
     
     prompt_path = os.path.join(
-        os.path.dirname(__file__), "../prompts/general_agent.txt"
+        os.path.dirname(__file__), "../prompts/research_agent.txt"
     )
     async with aiofiles.open(prompt_path, mode="r", encoding="utf-8") as f:
         prompt_template = await f.read()
     
-    # {tools} 변수만 실제 변수로 처리하고 나머지는 일반 텍스트로 처리하기 위한 방법
-    
-    # 1. {tools} 변수를 임시 토큰으로 대체
-    tools_token = "__TOOLS_PLACEHOLDER__"
-    prompt_template = prompt_template.replace("{tools}", tools_token)
-    
-    # 2. 따옴표를 이스케이프 처리 (LangChain이 변수로 해석할 수 있는 패턴 처리)
-    # `"source"`와 같은 패턴이 변수로 해석되는 것을 방지
-    prompt_template = prompt_template.replace('"', '\\"')
-    
-    # 3. 중괄호를 이스케이프 처리 (모든 { 를 {{ 로, } 를 }} 로 변경)
-    prompt_template = prompt_template.replace("{", "{{").replace("}", "}}")
-    
-    # 4. 임시 토큰을 다시 {tools} 변수로 복원
-    prompt_template = prompt_template.replace(f"{{{{{tools_token}}}}}", "{tools}")
-    
-    # 5. 도구 목록 삽입
+    # 단순 문자열 대체 사용
     prompt = prompt_template.replace("{tools}", tools_text)
     
-    logger.info("프롬프트 템플릿 처리 완료")
     return prompt
 
 
@@ -188,7 +168,7 @@ async def get_general_agent() -> str:
     """사용자 요청에 대한 계획을 생성합니다."""
     global _agent_instance
     prompt = await generate_prompt()
-    logger.info("프롬프트 생성 완료")
+    logger.info(f"프롬프트 생성 완료: {prompt}")
     system_prompt = ChatPromptTemplate.from_messages(
         [("system", prompt), MessagesPlaceholder(variable_name="messages")]
     )

@@ -76,8 +76,6 @@ async def list_collections() -> List[str]:
     예시 요청:
         list_collections()
         
-    예시 응답:
-        ["documents", "images", "embeddings"]
     """
     logger.info("컬렉션 목록 조회 요청")
     
@@ -102,8 +100,6 @@ async def drop_collection(collection_name: str = DEFAULT_COLLECTION_NAME) -> Dic
     예시 요청:
         drop_collection(collection_name="my_collection")
         
-    예시 응답:
-        {{ "msg": "Collection my_collection has been dropped successfully" }}
     """
     logger.info(f"컬렉션 삭제 요청: 컬렉션={collection_name}")
     
@@ -128,30 +124,7 @@ async def get_collection_info(collection_name: str = DEFAULT_COLLECTION_NAME) ->
         
     예시 요청:
         get_collection_info(collection_name="my_collection")
-        
-    예시 응답:
-        {{
-            "collection_name": "my_collection",
-            "description": "",
-            "fields": [
-                {{
-                    "name": "id",
-                    "description": "",
-                    "type": "Int64",
-                    "params": {{}},
-                    "is_primary": true
-                }},
-                {{
-                    "name": "dense_vector",
-                    "description": "",
-                    "type": "FloatVector",
-                    "params": {{"dim": 768}},
-                    "is_primary": false
-                }}
-            ],
-            "indexes": [...],
-            "load_status": {...}
-        }}
+
     """
     logger.info(f"컬렉션 정보 조회 요청: 컬렉션={collection_name}")
     
@@ -189,8 +162,6 @@ async def create_collection(
             description="문서 임베딩 컬렉션"
         )
         
-    예시 응답:
-        {{ "msg": "Collection my_collection has been created successfully" }}
     """
     logger.info(f"컬렉션 생성 요청: 컬렉션={collection_name}, 차원={dimension}")
     
@@ -318,12 +289,7 @@ async def insert_embeddings(
             contents=["이것은 문서 1입니다", "This is document 2"],
             directories=["/path/to/docs", "/path/to/docs"]
         )
-        
-    예시 응답:
-        {{
-            "insert_count": 2,
-            "ids": [1, 2]
-        }}
+    
     """
     logger.info(f"임베딩 삽입 요청: 컬렉션={collection_name}, 벡터 수={len(vectors) if vectors else 0}")
     
@@ -417,23 +383,6 @@ async def search_vectors(
             output_fields=["file_path", "title", "content"]
         )
         
-    예시 응답:
-        [
-            {{
-                "id": 1,
-                "file_path": "document1.pdf",
-                "title": "문서 1",
-                "content": "이것은 문서 1입니다",
-                "score": 0.95
-            }},
-            {{
-                "id": 3,
-                "file_path": "document3.pdf",
-                "title": "문서 3",
-                "content": "이것은 문서 3입니다",
-                "score": 0.82
-            }}
-        ]
     """
     logger.info(f"벡터 검색 요청: 컬렉션={collection_name}")
     
@@ -514,26 +463,6 @@ async def search_text(
             language="ko"
         )
         
-    예시 응답:
-        {{
-            "query": "머신러닝 기초 개념",
-            "results": [
-                {{
-                    "id": 1,
-                    "file_path": "ml_basic.pdf",
-                    "title": "머신러닝의 기초",
-                    "content": "머신러닝의 기초 개념과 알고리즘을 설명합니다.",
-                    "score": 0.95
-                }},
-                {{
-                    "id": 5,
-                    "file_path": "deep_learning.pdf",
-                    "title": "딥러닝과 머신러닝",
-                    "content": "딥러닝과 머신러닝 비교 및 기본 개념",
-                    "score": 0.82
-                }}
-            ]
-        }}
     """
     logger.info(f"텍스트 검색 요청: 컬렉션={collection_name}, 쿼리={query_text}")
     
@@ -584,8 +513,6 @@ async def list_databases() -> List[str]:
     예시 요청:
         list_databases()
         
-    예시 응답:
-        ["default", "production", "testing"]
     """
     logger.info("데이터베이스 목록 조회 요청")
     
@@ -610,8 +537,6 @@ async def use_database(db_name: str) -> Dict[str, Any]:
     예시 요청:
         use_database(db_name="production")
         
-    예시 응답:
-        {{ "msg": "Switched to database production" }}
     """
     logger.info(f"데이터베이스 전환 요청: 데이터베이스={db_name}")
     

@@ -1,0 +1,11 @@
+langgraph==0.4.0
+langchain==0.3.0
+python-dotenv
+loguru
+langchain-google-vertexai
+langchain-mcp-adapters==0.1.1
+langfuse
+uvicorn
+pydantic
+fastapi
+aiofiles

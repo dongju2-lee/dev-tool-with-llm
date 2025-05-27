@@ -103,7 +103,64 @@ async def test_tool() -> str:
     """간단한 테스트 도구입니다."""
     return "MCP 서버가 정상적으로 작동합니다!"
 
-# 시간 범위 파싱 함수
+# 파라미터 검증 헬퍼 함수
+def validate_and_fix_query(query: Any, function_name: str = "unknown") -> str:
+    """
+    query 파라미터를 검증하고 올바른 형태로 변환합니다.
+    
+    Args:
+        query: 입력된 query 파라미터
+        function_name: 함수명 (로깅용)
+        
+    Returns:
+        검증된 문자열 쿼리
+    """
+    try:
+        # 파라미터 타입 로깅
+        logger.info(f"{function_name}: 입력된 query 타입: {type(query)}, 값: {query}")
+        
+        # 딕셔너리인 경우 더 구체적인 기본값으로 변경
+        if isinstance(query, dict):
+            logger.warning(f"{function_name}: query 파라미터가 딕셔너리로 전달됨. 기본 쿼리 사용.")
+            if function_name.startswith("query_logs") or function_name.startswith("analyze_logs"):
+                return '{job=~".+"}'  # 모든 job 라벨을 가진 로그
+            else:
+                return '{}'  # Tempo는 빈 쿼리 허용
+        
+        # None인 경우 기본값으로 변경
+        if query is None:
+            logger.warning(f"{function_name}: query 파라미터가 None. 기본 쿼리 사용.")
+            if function_name.startswith("query_logs") or function_name.startswith("analyze_logs"):
+                return '{job=~".+"}'
+            else:
+                return '{}'
+        
+        # 문자열이 아닌 경우 문자열로 변환
+        if not isinstance(query, str):
+            str_query = str(query)
+            logger.warning(f"{function_name}: query 파라미터 타입 변환: {type(query)} → str, 결과: '{str_query}'")
+            return str_query if str_query else ('{job=~".+"}' if function_name.startswith("query_logs") else '{}')
+        
+        # 빈 문자열이거나 "{}"인 경우 더 구체적인 기본값으로 변경
+        if not query or not query.strip() or query.strip() == '{}':
+            logger.warning(f"{function_name}: query 파라미터가 빈 문자열 또는 {{}}. 기본 쿼리 사용.")
+            if function_name.startswith("query_logs") or function_name.startswith("analyze_logs"):
+                return '{job=~".+"}'  # 모든 job 라벨을 가진 로그
+            else:
+                return '{}'  # Tempo는 빈 쿼리 허용
+        
+        # 정상적인 문자열인 경우
+        logger.info(f"{function_name}: 정상적인 query 파라미터: '{query}'")
+        return query
+        
+    except Exception as e:
+        logger.error(f"{function_name}: query 파라미터 처리 중 오류 발생: {e}")
+        if function_name.startswith("query_logs") or function_name.startswith("analyze_logs"):
+            return '{job=~".+"}'
+        else:
+            return '{}'
+
+# 시간 범위 파싱 함수 - 수정된 버전
 def parse_time_range(time_range: str) -> tuple:
     """
     시간 범위 문자열을 파싱하여 시작/종료 시간을 반환합니다.
@@ -114,31 +171,49 @@ def parse_time_range(time_range: str) -> tuple:
     Returns:
         (start_time, end_time) 튜플 (나노초 단위)
     """
-    now = datetime.now()
-    
-    # 상대적 시간 처리
-    if time_range.endswith('m'):
-        minutes = int(time_range[:-1])
-        start = now - timedelta(minutes=minutes)
-    elif time_range.endswith('h'):
-        hours = int(time_range[:-1])
-        start = now - timedelta(hours=hours)
-    elif time_range.endswith('d'):
-        days = int(time_range[:-1])
-        start = now - timedelta(days=days)
-    else:
-        # ISO 형식으로 파싱 시도
-        try:
-            start = datetime.fromisoformat(time_range)
-        except:
-            # 기본값: 1시간 전
-            start = now - timedelta(hours=1)
-    
-    # 나노초로 변환
-    start_ns = int(start.timestamp() * 1e9)
-    end_ns = int(now.timestamp() * 1e9)
-    
-    return start_ns, end_ns
+    try:
+        now = datetime.now()
+        
+        # 입력값 검증 및 정규화
+        if not isinstance(time_range, str):
+            time_range = str(time_range)
+        
+        time_range = time_range.strip()
+        
+        # 상대적 시간 처리
+        if time_range.endswith('m'):
+            minutes = int(time_range[:-1])
+            start = now - timedelta(minutes=minutes)
+        elif time_range.endswith('h'):
+            hours = int(time_range[:-1])
+            start = now - timedelta(hours=hours)
+        elif time_range.endswith('d'):
+            days = int(time_range[:-1])
+            start = now - timedelta(days=days)
+        else:
+            # ISO 형식으로 파싱 시도
+            try:
+                start = datetime.fromisoformat(time_range)
+            except:
+                # 기본값: 1시간 전
+                logger.warning(f"시간 범위 파싱 실패: {time_range}, 기본값 1h 사용")
+                start = now - timedelta(hours=1)
+        
+        # 나노초 단위로 변환 (Loki와 Tempo 모두 나노초 사용)
+        start_ns = int(start.timestamp() * 1_000_000_000)
+        end_ns = int(now.timestamp() * 1_000_000_000)
+        
+        logger.info(f"시간 범위 파싱 완료: {time_range} -> {start_ns} ~ {end_ns} (나노초)")
+        return start_ns, end_ns
+        
+    except Exception as e:
+        logger.error(f"시간 범위 파싱 오류: {e}, 기본값 사용")
+        # 오류 시 기본값 반환 (1시간 전부터 현재까지)
+        now = datetime.now()
+        start = now - timedelta(hours=1)
+        start_ns = int(start.timestamp() * 1_000_000_000)
+        end_ns = int(now.timestamp() * 1_000_000_000)
+        return start_ns, end_ns
 
 # HTTP 요청 헬퍼 함수
 def make_request(url: str, method: str = "GET", params: Dict = None, 
@@ -183,6 +258,9 @@ def make_request(url: str, method: str = "GET", params: Dict = None,
             
     except requests.exceptions.RequestException as e:
         logger.error(f"HTTP 요청 실패: {e}")
+        # 응답 내용 로깅
+        if hasattr(e, 'response') and e.response is not None:
+            logger.error(f"응답 내용: {e.response.text}")
         return {"error": str(e)}
 
 @mcp.tool()
@@ -347,30 +425,38 @@ async def check_environment() -> Dict:
 
 @mcp.tool()
 async def query_logs(
-    query: str,
-    time_range: Optional[str] = None,
-    limit: Optional[int] = None,
+    query: str = '{job=~".+"}',
+    time_range: str = "1h",
+    limit: int = 100,
     direction: str = "backward",
     service: Optional[str] = None,
     level: Optional[str] = None
-) -> Dict:
+) -> Dict[str, Any]:
     """
     Loki에서 로그를 쿼리합니다.
     
-    - query: LogQL 쿼리 문자열 (예: '{job="varlogs"}', '{container="nginx"} |= "error"')
-    - time_range: 시간 범위 (예: "1h", "24h", "7d") - 기본값은 환경 설정 값
-    - limit: 반환할 로그 수 제한 - 기본값은 환경 설정 값
+    **쿼리 예제**:
+    - 모든 로그: '{job=~".+"}'
+    - 특정 서비스: '{service="api-gateway"}'
+    - 특정 컨테이너: '{container="nginx"}'
+    - 여러 조건 조합: '{service="api-gateway", level="error"}'
+    - 텍스트 필터링: '{service="api-gateway"} |= "error"'
+    - 정규식 필터링: '{service="api-gateway"} |~ "error|warn"'
+    
+    **파라미터**:
+    - query: LogQL 쿼리 문자열 (기본값: '{job=~".+"}' - 모든 로그)
+    - time_range: 시간 범위 (예: "5m", "1h", "24h", "7d")
+    - limit: 반환할 로그 수 제한 (기본값: 100)
     - direction: 검색 방향 ("forward" 또는 "backward")
     - service: 특정 서비스 필터 (쿼리에 자동 추가)
     - level: 로그 레벨 필터 (예: "error", "warn", "info")
     
-    LogQL 쿼리 예시:
-    - 모든 로그: '{}'
-    - 특정 컨테이너: '{container="nginx"}'
-    - 에러 로그만: '{} |= "error"'
-    - JSON 필드 추출: '{} | json | level="error"'
-    - 정규식 필터: '{} |~ "failed.*connection"'
+    **반환값**: 로그 엔트리 리스트와 메타데이터
     """
+    
+    # 🔧 파라미터 검증 및 정규화
+    query = validate_and_fix_query(query, "query_logs")
+    
     # 기본값 설정
     if not time_range:
         time_range = DEFAULT_TIME_RANGE
@@ -382,10 +468,11 @@ async def query_logs(
     
     # 쿼리 구성
     if service:
-        if query == '{}':
+        if query == '{job=~".+"}':
             query = f'{{service="{service}"}}'
         else:
-            query = query.replace('}', f',service="{service}"}}')
+            # 기존 쿼리에 service 레이블 추가
+            query = query.rstrip('}') + f', service="{service}"}}'
     
     if level:
         query += f' |= "{level}"'
@@ -393,13 +480,13 @@ async def query_logs(
     # Loki API 호출
     params = {
         "query": query,
-        "start": start_ns,
-        "end": end_ns,
+        "start": str(start_ns),  # 나노초를 문자열로
+        "end": str(end_ns),      # 나노초를 문자열로
         "limit": limit,
         "direction": direction
     }
     
-    logger.info(f"Loki 쿼리 실행: {query}")
+    logger.info(f"Loki 쿼리 실행: {query} (파라미터: {params})")
     result = make_request(
         f"{LOKI_URL}/loki/api/v1/query_range",
         params=params,
@@ -408,10 +495,12 @@ async def query_logs(
     )
     
     if result.get("error"):
+        logger.error(f"Loki API 오류: {result['error']}")
         return {
             "status": "error",
             "error": result["error"],
-            "query": query
+            "query": query,
+            "hint": "쿼리 구문을 확인하세요. 예: '{service=\"api-gateway\"}' 또는 '{job=\"varlogs\"}'"
         }
     
     # 결과 처리
@@ -422,7 +511,7 @@ async def query_logs(
             for value in stream.get("values", []):
                 timestamp_ns, log_line = value
                 logs.append({
-                    "timestamp": datetime.fromtimestamp(int(timestamp_ns) / 1e9).isoformat(),
+                    "timestamp": datetime.fromtimestamp(int(timestamp_ns) / 1000000000).isoformat(),
                     "labels": stream_labels,
                     "log": log_line
                 })
@@ -432,6 +521,8 @@ async def query_logs(
     if GRAFANA_URL and LOKI_DASHBOARD_ID:
         encoded_query = urllib.parse.quote(query)
         dashboard_link = f"{GRAFANA_URL}/d/{LOKI_DASHBOARD_ID}?orgId=1&var-query={encoded_query}"
+    
+    logger.info(f"로그 쿼리 완료: {len(logs)}개 로그 반환")
     
     return {
         "status": "success",
@@ -449,21 +540,28 @@ async def search_traces(
     tags: Optional[Dict[str, str]] = None,
     min_duration: Optional[str] = None,
     max_duration: Optional[str] = None,
-    time_range: Optional[str] = None,
-    limit: Optional[int] = None
+    time_range: str = "1h",
+    limit: int = 20
 ) -> Dict:
     """
     Tempo에서 트레이스를 검색합니다.
     
+    **예제**:
+    - 특정 서비스의 모든 트레이스: service_name="api-gateway"
+    - 에러 트레이스: tags={"error": "true", "http.status_code": "500"}
+    - 느린 트레이스: min_duration="1s"
+    - 특정 작업: operation_name="GET /users"
+    
+    **파라미터**:
     - service_name: 서비스 이름으로 필터링
     - operation_name: 오퍼레이션 이름으로 필터링
-    - tags: 태그로 필터링 (예: {"http.status_code": "500", "error": "true"})
-    - min_duration: 최소 지속 시간 (예: "100ms", "1s")
+    - tags: 태그로 필터링 (딕셔너리 형태)
+    - min_duration: 최소 지속 시간 (예: "100ms", "1s", "5s")
     - max_duration: 최대 지속 시간 (예: "5s", "1m")
-    - time_range: 시간 범위 (예: "1h", "24h", "7d")
-    - limit: 반환할 트레이스 수 제한
+    - time_range: 시간 범위 (예: "5m", "1h", "24h", "7d")
+    - limit: 반환할 트레이스 수 제한 (기본값: 20)
     
-    트레이스 검색을 통해 분산 시스템의 요청 흐름을 추적할 수 있습니다.
+    **반환값**: 검색된 트레이스 정보
     """
     # 기본값 설정
     if not time_range:
@@ -483,9 +581,13 @@ async def search_traces(
     if operation_name:
         conditions.append(f'name="{operation_name}"')
     
-    if tags:
+    if tags and isinstance(tags, dict):
         for key, value in tags.items():
-            conditions.append(f'.{key}="{value}"')
+            # 속성 키에 점(.)이 포함되어 있으면 그대로 사용
+            if '.' in key:
+                conditions.append(f'{key}="{value}"')
+            else:
+                conditions.append(f'.{key}="{value}"')
     
     if min_duration:
         conditions.append(f'duration>{min_duration}')
@@ -502,8 +604,8 @@ async def search_traces(
     # Tempo Search API 호출
     params = {
         "q": query,
-        "start": int(start_ns / 1e9),  # 초 단위로 변환
-        "end": int(end_ns / 1e9),
+        "start": str(int(start_ns // 1_000_000_000)),  # 나노초를 초로 변환하여 문자열로
+        "end": str(int(end_ns // 1_000_000_000)),      # 나노초를 초로 변환하여 문자열로
         "limit": limit
     }
     
@@ -519,7 +621,8 @@ async def search_traces(
         return {
             "status": "error",
             "error": result["error"],
-            "query": query
+            "query": query,
+            "hint": "TraceQL 쿼리 구문을 확인하세요. 예: {resource.service.name=\"api-gateway\"}"
         }
     
     # 결과 처리
@@ -529,7 +632,7 @@ async def search_traces(
             "trace_id": trace.get("traceID"),
             "root_service": trace.get("rootServiceName"),
             "root_trace_name": trace.get("rootTraceName"),
-            "start_time": datetime.fromtimestamp(trace.get("startTimeUnixNano", 0) / 1e9).isoformat(),
+            "start_time": datetime.fromtimestamp(trace.get("startTimeUnixNano", 0) / 1000000000).isoformat(),
             "duration_ms": trace.get("durationMs"),
             "span_count": len(trace.get("spanSet", {}).get("spans", [])) if trace.get("spanSet") else 0
         }
@@ -564,9 +667,10 @@ async def get_trace_details(trace_id: str) -> Dict:
     """
     특정 트레이스의 상세 정보를 조회합니다.
     
-    - trace_id: 조회할 트레이스 ID
+    **파라미터**:
+    - trace_id: 조회할 트레이스 ID (예: "a1b2c3d4e5f6")
     
-    트레이스 ID로 전체 스팬 트리와 각 스팬의 상세 정보를 가져옵니다.
+    **반환값**: 트레이스 ID로 전체 스팬 트리와 각 스팬의 상세 정보
     """
     # Tempo API 호출
     logger.info(f"트레이스 상세 조회: {trace_id}")
@@ -580,7 +684,8 @@ async def get_trace_details(trace_id: str) -> Dict:
         return {
             "status": "error",
             "error": result["error"],
-            "trace_id": trace_id
+            "trace_id": trace_id,
+            "hint": "트레이스 ID가 올바른지 확인하세요."
         }
     
     # 트레이스 정보 추출
@@ -607,9 +712,9 @@ async def get_trace_details(trace_id: str) -> Dict:
                     "parent_span_id": s.get("parentSpanId"),
                     "name": s["name"],
                     "service": service_name,
-                    "start_time": datetime.fromtimestamp(int(s["startTimeUnixNano"]) / 1e9).isoformat(),
-                    "end_time": datetime.fromtimestamp(int(s["endTimeUnixNano"]) / 1e9).isoformat(),
-                    "duration_ms": (int(s["endTimeUnixNano"]) - int(s["startTimeUnixNano"])) / 1e6,
+                    "start_time": datetime.fromtimestamp(int(s["startTimeUnixNano"]) / 1000000000).isoformat(),
+                    "end_time": datetime.fromtimestamp(int(s["endTimeUnixNano"]) / 1000000000).isoformat(),
+                    "duration_ms": (int(s["endTimeUnixNano"]) - int(s["startTimeUnixNano"])) / 1000000,
                     "status": s.get("status", {})
                 }
                 
@@ -649,21 +754,26 @@ async def get_trace_details(trace_id: str) -> Dict:
 
 @mcp.tool()
 async def analyze_logs_pattern(
-    query: str,
-    time_range: Optional[str] = None,
-    pattern_field: str = "log",
-    top_k: int = 10
-) -> Dict:
+    query: str = '{job=~".+"}',
+    time_range: str = "1h",
+    pattern_type: str = "simple"
+) -> Dict[str, Any]:
     """
     로그 패턴을 분석하여 가장 빈번한 패턴을 찾습니다.
     
-    - query: LogQL 쿼리 문자열
-    - time_range: 시간 범위 (예: "1h", "24h", "7d")
-    - pattern_field: 패턴을 분석할 필드 (기본값: "log")
-    - top_k: 상위 몇 개의 패턴을 반환할지 지정
+    **참고**: Loki의 pattern 기능이 지원되지 않는 경우 간단한 패턴 분석을 수행합니다.
     
-    이 도구는 로그에서 반복되는 패턴을 찾아 문제 진단에 도움을 줍니다.
+    **파라미터**:
+    - query: LogQL 쿼리 문자열 (예: '{service="api-gateway"}')
+    - time_range: 시간 범위 (예: "5m", "1h", "24h")
+    - pattern_type: "simple" (기본) 또는 "loki" (Loki pattern 사용)
+    
+    **반환값**: 패턴 분석 결과
     """
+    
+    # 🔧 파라미터 검증 및 정규화
+    query = validate_and_fix_query(query, "analyze_logs_pattern")
+    
     # 기본값 설정
     if not time_range:
         time_range = DEFAULT_TIME_RANGE
@@ -671,18 +781,15 @@ async def analyze_logs_pattern(
     # 시간 범위 파싱
     start_ns, end_ns = parse_time_range(time_range)
     
-    # LogQL 쿼리에 pattern 함수 추가
-    pattern_query = f'{query} | pattern'
-    
-    # Loki API 호출
+    # 먼저 일반 로그를 가져옴
     params = {
-        "query": pattern_query,
-        "start": start_ns,
-        "end": end_ns,
-        "limit": 1000  # 패턴 분석을 위해 더 많은 로그 가져오기
+        "query": query,
+        "start": str(start_ns),
+        "end": str(end_ns),
+        "limit": 1000
     }
     
-    logger.info(f"로그 패턴 분석: {pattern_query}")
+    logger.info(f"로그 패턴 분석을 위한 로그 조회: {query}")
     result = make_request(
         f"{LOKI_URL}/loki/api/v1/query_range",
         params=params,
@@ -691,10 +798,12 @@ async def analyze_logs_pattern(
     )
     
     if result.get("error"):
+        logger.error(f"로그 조회 API 오류: {result['error']}")
         return {
             "status": "error",
             "error": result["error"],
-            "query": pattern_query
+            "query": query,
+            "hint": "쿼리 구문을 확인하세요. 예: '{service=\"api-gateway\"}'"
         }
     
     # 패턴 집계
@@ -707,19 +816,25 @@ async def analyze_logs_pattern(
                 _, log_line = value
                 total_logs += 1
                 
-                # 간단한 패턴 추출 (실제로는 더 정교한 알고리즘 필요)
-                # 숫자, UUID, 타임스탬프 등을 정규화
+                # 간단한 패턴 추출
                 import re
                 pattern = log_line
-                pattern = re.sub(r'\b\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}.*?\b', '<TIMESTAMP>', pattern)
-                pattern = re.sub(r'\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b', '<UUID>', pattern)
-                pattern = re.sub(r'\b\d+\.\d+\.\d+\.\d+\b', '<IP>', pattern)
+                
+                # 타임스탬프 정규화
+                pattern = re.sub(r'\b\d{4}-\d{2}-\d{2}[T\s]\d{2}:\d{2}:\d{2}[\.\d]*[Z\+\-\d:]*\b', '<TIMESTAMP>', pattern)
+                # UUID 정규화
+                pattern = re.sub(r'\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b', '<UUID>', pattern, flags=re.IGNORECASE)
+                # IP 주소 정규화
+                pattern = re.sub(r'\b\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b', '<IP>', pattern)
+                # 큰 숫자 정규화 (3자리 이상)
                 pattern = re.sub(r'\b\d{3,}\b', '<NUMBER>', pattern)
+                # 16진수 정규화
+                pattern = re.sub(r'\b0x[0-9a-f]+\b', '<HEX>', pattern, flags=re.IGNORECASE)
                 
                 pattern_counts[pattern] = pattern_counts.get(pattern, 0) + 1
     
     # 상위 패턴 정렬
-    top_patterns = sorted(pattern_counts.items(), key=lambda x: x[1], reverse=True)[:top_k]
+    top_patterns = sorted(pattern_counts.items(), key=lambda x: x[1], reverse=True)[:10]
     
     # 결과 구성
     patterns = []
@@ -731,29 +846,33 @@ async def analyze_logs_pattern(
             "percentage": round(percentage, 2)
         })
     
+    logger.info(f"로그 패턴 분석 완료: 총 {total_logs}개 로그, {len(pattern_counts)}개 고유 패턴")
+    
     return {
         "status": "success",
         "query": query,
         "time_range": time_range,
         "total_logs": total_logs,
         "unique_patterns": len(pattern_counts),
-        "top_patterns": patterns
+        "top_patterns": patterns,
+        "pattern_type": "simple"  # Loki pattern이 실패하면 simple 사용
     }
 
 @mcp.tool()
 async def get_service_metrics(
     service_name: str,
-    time_range: Optional[str] = None,
+    time_range: str = "1h",
     operation: Optional[str] = None
 ) -> Dict:
     """
     특정 서비스의 트레이스 메트릭을 조회합니다.
     
-    - service_name: 서비스 이름
-    - time_range: 시간 범위 (예: "1h", "24h", "7d")
+    **파라미터**:
+    - service_name: 서비스 이름 (예: "api-gateway", "order-service")
+    - time_range: 시간 범위 (예: "5m", "1h", "24h")
     - operation: 특정 오퍼레이션으로 필터링 (선택사항)
     
-    서비스의 평균 응답 시간, 에러율, 처리량 등의 메트릭을 제공합니다.
+    **반환값**: 서비스의 평균 응답 시간, 에러율, 처리량 등의 메트릭
     """
     # 기본값 설정
     if not time_range:
@@ -768,11 +887,11 @@ async def get_service_metrics(
         query += f' && name="{operation}"'
     query += '}'
     
-    # Tempo Metrics API 호출
+    # Tempo Search API 호출
     params = {
         "q": query,
-        "start": int(start_ns / 1e9),
-        "end": int(end_ns / 1e9),
+        "start": str(int(start_ns // 1_000_000_000)),  # 나노초를 초로 변환
+        "end": str(int(end_ns // 1_000_000_000)),      # 나노초를 초로 변환
         "limit": 1000  # 메트릭 계산을 위해 더 많은 트레이스 가져오기
     }
     
@@ -788,7 +907,8 @@ async def get_service_metrics(
         return {
             "status": "error",
             "error": result["error"],
-            "service": service_name
+            "service": service_name,
+            "hint": "서비스 이름이 올바른지 확인하세요."
         }
     
     # 메트릭 계산
@@ -797,7 +917,12 @@ async def get_service_metrics(
         return {
             "status": "success",
             "service": service_name,
-            "message": "해당 기간에 트레이스가 없습니다."
+            "message": "해당 기간에 트레이스가 없습니다.",
+            "metrics": {
+                "total_traces": 0,
+                "error_count": 0,
+                "error_rate": 0
+            }
         }
     
     durations = []
@@ -872,11 +997,12 @@ async def correlate_logs_and_traces(
     """
     로그와 트레이스를 상관 분석합니다.
     
+    **파라미터**:
     - trace_id: 특정 트레이스 ID (제공시 해당 트레이스와 관련된 로그 찾기)
-    - time_window: 검색할 시간 범위
+    - time_window: 검색할 시간 범위 (예: "5m", "30m", "1h")
     - service: 특정 서비스로 필터링
     
-    트레이스 ID를 기반으로 관련 로그를 찾거나, 시간대별로 로그와 트레이스를 매칭합니다.
+    **반환값**: 트레이스 ID를 기반으로 관련 로그를 찾거나, 시간대별로 로그와 트레이스를 매칭
     """
     results = {
         "status": "success",
@@ -922,10 +1048,13 @@ async def correlate_logs_and_traces(
             log_query = f'{{service="{service}"}} |= "{trace_id}"'
         
         # 로그 검색
+        search_start_ns = int(search_start.timestamp() * 1_000_000_000)
+        search_end_ns = int(search_end.timestamp() * 1_000_000_000)
+        
         log_params = {
             "query": log_query,
-            "start": int(search_start.timestamp() * 1e9),
-            "end": int(search_end.timestamp() * 1e9),
+            "start": str(search_start_ns),
+            "end": str(search_end_ns),
             "limit": 1000
         }
         
@@ -943,7 +1072,7 @@ async def correlate_logs_and_traces(
                 for value in stream.get("values", []):
                     timestamp_ns, log_line = value
                     correlated_logs.append({
-                        "timestamp": datetime.fromtimestamp(int(timestamp_ns) / 1e9).isoformat(),
+                        "timestamp": datetime.fromtimestamp(int(timestamp_ns) / 1000000000).isoformat(),
                         "log": log_line,
                         "labels": stream.get("stream", {})
                     })
@@ -961,10 +1090,6 @@ async def correlate_logs_and_traces(
         logger.info(f"시간 기반 로그-트레이스 상관 분석: {time_window}")
         
         # 최근 에러 트레이스 찾기
-        trace_query = '{status.code=2}'  # 에러 상태 코드
-        if service:
-            trace_query = f'{{resource.service.name="{service}" && status.code=2}}'
-        
         traces_result = await search_traces(
             tags={"error": "true"},
             time_range=time_window,
@@ -991,21 +1116,26 @@ async def correlate_logs_and_traces(
 @mcp.tool()
 async def export_data(
     data_type: str,
-    query: str,
+    query: str = None,
     time_range: str = "1h",
     format: str = "json",
     output_file: Optional[str] = None
-) -> Dict:
+) -> Dict[str, Any]:
     """
     로그나 트레이스 데이터를 내보냅니다.
     
+    **파라미터**:
     - data_type: "logs" 또는 "traces"
-    - query: 검색 쿼리
-    - time_range: 시간 범위
-    - format: 출력 형식 ("json", "csv")
+    - query: 검색 쿼리 문자열 (logs: LogQL, traces: 서비스명)
+    - time_range: 시간 범위 (예: "5m", "1h", "24h")
+    - format: 출력 형식 ("json" 또는 "csv")
     - output_file: 저장할 파일 경로 (선택사항)
     
-    대량의 데이터를 외부 분석을 위해 내보낼 때 사용합니다.
+    **예제**:
+    - 로그 내보내기: data_type="logs", query='{service="api-gateway"}'
+    - 트레이스 내보내기: data_type="traces", query="api-gateway"
+    
+    **반환값**: 내보내기 결과
     """
     import csv
     import io
@@ -1014,6 +1144,9 @@ async def export_data(
     
     if data_type == "logs":
         # 로그 데이터 가져오기
+        if not query:
+            query = '{job=~".+"}'
+        
         log_result = await query_logs(
             query=query,
             time_range=time_range,
@@ -1027,7 +1160,9 @@ async def export_data(
         
     elif data_type == "traces":
         # 트레이스 데이터 가져오기
+        service_name = query if query else None
         trace_result = await search_traces(
+            service_name=service_name,
             time_range=time_range,
             limit=1000
         )

@@ -44,7 +44,7 @@ MCP_SERVERS = {
     #     ),
     #     "transport": "sse",
     # },
-    "loki_tempo": {
+    "loki-tempo": {
         "url": os.environ.get(
             "LOKI_TEMPO_MCP_URL", "http://localhost:10002/sse"
         ),

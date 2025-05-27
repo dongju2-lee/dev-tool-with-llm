@@ -12,7 +12,7 @@ class Settings(BaseSettings):
     llm_enabled: bool = True
 
     gcp_project_id: str = "gen-lang-client-0449310391"
-    gcp_vertexai_location: str = "asia-northeast1"
+    gcp_vertexai_location: str = "us-central1"
     model_name: str = "gemini-2.0-flash"
 
     langfuse_enabled: bool = False

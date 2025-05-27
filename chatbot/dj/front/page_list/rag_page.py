@@ -3,6 +3,7 @@ import json
 import datetime
 import streamlit as st
 import re
+import subprocess
 from pathlib import Path
 import shutil
 from utils.logging_config import setup_logger
@@ -12,6 +13,8 @@ logger = setup_logger(__name__)
 
 # RAG 저장소 경로 설정
 RAG_STORE_DIR = Path("/Users/idongju/dev/dev-tool-with-llm/chatbot/dj/front/rag_store")
+# RAG 유틸리티 경로 설정
+RAG_UTILS_DIR = Path("/Users/idongju/dev/dev-tool-with-llm/chatbot/dj/front/rag_utils")
 
 # 지원되는 파일 형식
 SUPPORTED_FILE_FORMATS = {
@@ -19,6 +22,9 @@ SUPPORTED_FILE_FORMATS = {
     "마크다운 파일 (*.md)": "md",
     "PDF 파일 (*.pdf)": "pdf",  # PDF 지원 추가
 }
+
+# 기본 컬렉션 이름 (사용자 입력이 없을 경우에만 사용)
+DEFAULT_COLLECTION_NAME = "dev_tool"
 
 def initialize_rag_store():
     """RAG 저장소 디렉토리 초기화"""
@@ -162,7 +168,8 @@ def save_uploaded_file(uploaded_file, collection_name, description="", convert_m
         "filename": filename,
         "original_filename": uploaded_file.name,
         "collection_name": collection_name,
-        "description": description,  # 설명 필드 추가
+        "rag_collection": collection_name,  # 컬렉션 이름을 기본 RAG 컬렉션 이름으로 설정
+        "description": description,
         "file_format": file_ext,
         "created_at": datetime.datetime.now().isoformat(),
         "file_path": str(file_path),
@@ -209,11 +216,190 @@ def delete_document(document_id):
     
     return False
 
-def create_rag(document_id):
-    """RAG 생성 (향후 구현)"""
-    # 향후 RAG 생성 기능 구현
-    logger.info(f"문서 ID {document_id}에 대한 RAG 생성 요청")
-    return True
+def create_rag(document_id, rag_collection_name):
+    """선택한 문서에 대한 RAG 임베딩 생성"""
+    try:
+        # 문서 메타데이터 불러오기
+        metadata = load_metadata()
+        doc = next((d for d in metadata if d["id"] == document_id), None)
+        
+        if not doc:
+            logger.error(f"문서 ID {document_id}를 찾을 수 없습니다.")
+            return False
+        
+        file_path = doc["file_path"]
+        file_format = doc["file_format"].lower()
+        
+        # 항상 사용자가 입력한 컬렉션 이름 사용
+        collection_name = rag_collection_name if rag_collection_name else DEFAULT_COLLECTION_NAME
+        logger.info(f"RAG 컬렉션 이름: {collection_name}")
+        
+        # 컬렉션 확인
+        check_collection_cmd = [
+            "python", 
+            str(RAG_UTILS_DIR / "list_collections.py")
+        ]
+        
+        logger.info(f"컬렉션 확인 명령 실행: {' '.join(check_collection_cmd)}")
+        
+        try:
+            # 컬렉션 목록 확인
+            result = subprocess.run(
+                check_collection_cmd, 
+                capture_output=True, 
+                text=True, 
+                check=False
+            )
+            logger.info(f"컬렉션 확인 결과: {result.stdout}")
+            
+            # 파일 형식에 따라 적절한 임베딩 스크립트 실행
+            if file_format == "txt":
+                # 텍스트 파일 임베딩
+                embedding_cmd = [
+                    "python",
+                    str(RAG_UTILS_DIR / "push_txt.py"),
+                    "--file", file_path,
+                    "--collection", collection_name
+                ]
+                logger.info(f"텍스트 임베딩 명령 실행: {' '.join(embedding_cmd)}")
+                
+                process = subprocess.Popen(
+                    embedding_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1
+                )
+                
+                # 실시간으로 출력 로깅
+                stdout_lines = []
+                stderr_lines = []
+                for line in process.stdout:
+                    logger.info(f"임베딩 출력: {line.strip()}")
+                    stdout_lines.append(line)
+                
+                for line in process.stderr:
+                    logger.error(f"임베딩 오류: {line.strip()}")
+                    stderr_lines.append(line)
+                
+                # 프로세스 종료 대기
+                return_code = process.wait()
+                
+                if return_code != 0:
+                    logger.error(f"텍스트 임베딩 실패. 반환 코드: {return_code}")
+                    logger.error(f"오류 메시지: {''.join(stderr_lines)}")
+                    return False
+                
+                logger.info(f"텍스트 임베딩 성공: {file_path}")
+                
+            elif file_format == "md":
+                # 마크다운 파일 임베딩
+                # push_md.py 파일에서 필요한 파라미터 설정
+                md_script_path = RAG_UTILS_DIR / "push_md.py"
+                
+                # 마크다운 스크립트 파일 수정 (정규식 사용 개선)
+                with open(md_script_path, 'r', encoding='utf-8') as f:
+                    md_script = f.read()
+                
+                # 정규식을 사용하여 정확히 변수 선언부만 변경
+                md_script = re.sub(
+                    r'COLLECTION_NAME\s*=\s*"COLLECTION_NAME"', 
+                    f'COLLECTION_NAME = "{collection_name}"', 
+                    md_script
+                )
+                
+                md_script = re.sub(
+                    r'DOCS_ROOT\s*=\s*pathlib\.Path\(\s*"FILE_PATH"\s*\)', 
+                    f'DOCS_ROOT = pathlib.Path("{os.path.dirname(file_path)}")', 
+                    md_script
+                )
+                
+                # Vertex AI 프로젝트 ID 설정 (필요한 경우)
+                md_script = re.sub(
+                    r'VERTEX_PROJECT_ID\s*=\s*"USER-PROJECT-ID"',
+                    'VERTEX_PROJECT_ID = "certain-wharf-453410-p8"',
+                    md_script
+                )
+                
+                # 수정된 스크립트를 임시 파일로 저장
+                temp_script_path = RAG_UTILS_DIR / "temp_push_md.py"
+                with open(temp_script_path, 'w', encoding='utf-8') as f:
+                    f.write(md_script)
+                
+                # 스크립트 실행
+                embedding_cmd = [
+                    "python",
+                    str(temp_script_path)
+                ]
+                
+                logger.info(f"마크다운 임베딩 명령 실행: {' '.join(embedding_cmd)}")
+                
+                process = subprocess.Popen(
+                    embedding_cmd,
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    bufsize=1
+                )
+                
+                # 실시간으로 출력 로깅
+                stdout_lines = []
+                stderr_lines = []
+                for line in process.stdout:
+                    logger.info(f"임베딩 출력: {line.strip()}")
+                    stdout_lines.append(line)
+                
+                for line in process.stderr:
+                    logger.error(f"임베딩 오류: {line.strip()}")
+                    stderr_lines.append(line)
+                
+                # 프로세스 종료 대기
+                return_code = process.wait()
+                
+                # 임시 파일 삭제
+                if temp_script_path.exists():
+                    temp_script_path.unlink()
+                
+                if return_code != 0:
+                    logger.error(f"마크다운 임베딩 실패. 반환 코드: {return_code}")
+                    logger.error(f"오류 메시지: {''.join(stderr_lines)}")
+                    return False
+                
+                logger.info(f"마크다운 임베딩 성공: {file_path}")
+                
+            elif file_format == "pdf":
+                # PDF 파일 임베딩 (향후 구현)
+                logger.warning("PDF 임베딩은 아직 구현되지 않았습니다.")
+                return False
+            
+            else:
+                logger.error(f"지원되지 않는 파일 형식: {file_format}")
+                return False
+            
+            # 성공적으로 RAG 생성 완료
+            # 메타데이터에 RAG 생성 여부 업데이트
+            doc["rag_created"] = True
+            doc["rag_created_at"] = datetime.datetime.now().isoformat()
+            doc["rag_collection"] = collection_name  # 사용자가 지정한 컬렉션 이름 저장
+            
+            # 업데이트된 메타데이터 저장
+            for i, d in enumerate(metadata):
+                if d["id"] == document_id:
+                    metadata[i] = doc
+                    break
+            
+            save_metadata(metadata)
+            logger.info(f"메타데이터 업데이트 완료: RAG 생성 정보 추가 (컬렉션: {collection_name})")
+            
+            return True
+            
+        except Exception as e:
+            logger.error(f"RAG 생성 중 예외 발생: {str(e)}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"RAG 생성 중 예외 발생: {str(e)}")
+        return False
 
 def read_text_file(file_path):
     """텍스트 파일 읽기"""
@@ -252,6 +438,9 @@ def render_sidebar():
                     st.caption(f"형식: {doc['file_format']}, 생성: {doc['created_at'][:10]}")
                     if doc.get("markdown_file_path"):
                         st.caption("마크다운 변환: ✓")
+                    # RAG 생성 여부 표시
+                    if doc.get("rag_created"):
+                        st.caption(f"🟢 RAG 생성됨: {doc.get('rag_created_at', '')[:10]}")
                 with col2:
                     if st.button("로드", key=f"load_{doc['id']}"):
                         st.session_state.selected_document = doc
@@ -267,7 +456,7 @@ def rag_page():
     # 세션 상태 초기화
     if "collection_name" not in st.session_state:
         st.session_state.collection_name = ""
-    if "description" not in st.session_state:  # 설명 필드 세션 상태 추가
+    if "description" not in st.session_state:
         st.session_state.description = ""
     if "selected_format" not in st.session_state:
         st.session_state.selected_format = next(iter(SUPPORTED_FILE_FORMATS.keys()))
@@ -275,6 +464,8 @@ def rag_page():
         st.session_state.selected_document = None
     if "convert_to_md" not in st.session_state:
         st.session_state.convert_to_md = False
+    if "rag_collection_name" not in st.session_state:
+        st.session_state.rag_collection_name = ""  # 빈 값으로 초기화하여 사용자 입력 유도
     
     # 사이드바 렌더링
     render_sidebar()
@@ -342,7 +533,7 @@ def rag_page():
                         doc = save_uploaded_file(
                             uploaded_file, 
                             collection_name,
-                            description=description,  # 설명 전달
+                            description=description,
                             convert_md=convert_to_md
                         )
                         success_msg = f"문서가 성공적으로 저장되었습니다: {doc['filename']}"
@@ -350,8 +541,10 @@ def rag_page():
                             success_msg += " (마크다운 변환 완료)"
                         st.success(success_msg)
                         st.session_state.collection_name = ""
-                        st.session_state.description = ""  # 설명 필드 초기화
+                        st.session_state.description = ""
                         st.session_state.selected_document = doc
+                        # 저장한 문서의 컬렉션 이름을 RAG 컬렉션 이름 필드에 자동으로 설정
+                        st.session_state.rag_collection_name = collection_name
                         st.rerun()
         
         with col_btn2:
@@ -365,12 +558,37 @@ def rag_page():
                     st.error("삭제할 문서를 선택해주세요.")
         
         with col_btn3:
-            if st.button("RAG 생성", use_container_width=True):
-                if st.session_state.selected_document:
-                    with st.spinner("RAG 생성 중..."):
-                        if create_rag(st.session_state.selected_document["id"]):
-                            st.success("RAG가 성공적으로 생성되었습니다.")
-                else:
+            # RAG 생성 버튼 섹션
+            if st.session_state.selected_document:
+                # 선택된 문서의 컬렉션 이름을 기본값으로 설정
+                if st.session_state.rag_collection_name == "":
+                    st.session_state.rag_collection_name = st.session_state.selected_document.get("collection_name", "")
+                
+                # RAG 컬렉션 이름 입력 필드 추가
+                rag_collection_name = st.text_input(
+                    "RAG 컬렉션 이름",
+                    value=st.session_state.rag_collection_name,
+                    help="임베딩할 RAG 컬렉션 이름을 입력하세요 (기본값은 문서 컬렉션 이름과 동일)"
+                )
+                st.session_state.rag_collection_name = rag_collection_name
+                
+                if st.button("RAG 생성", use_container_width=True):
+                    if not rag_collection_name:
+                        st.error("RAG 컬렉션 이름을 입력해주세요.")
+                    else:
+                        with st.spinner("RAG 임베딩 생성 중... 이 작업은 몇 분 정도 소요될 수 있습니다."):
+                            if create_rag(st.session_state.selected_document["id"], rag_collection_name):
+                                st.success(f"RAG가 성공적으로 생성되었습니다. 컬렉션 이름: {rag_collection_name}")
+                                # 성공 후 메타데이터 다시 로드
+                                st.session_state.selected_document = next(
+                                    (d for d in load_metadata() if d["id"] == st.session_state.selected_document["id"]), 
+                                    st.session_state.selected_document
+                                )
+                                st.rerun()
+                            else:
+                                st.error("RAG 생성 중 오류가 발생했습니다. 로그를 확인해주세요.")
+            else:
+                if st.button("RAG 생성", use_container_width=True):
                     st.error("RAG를 생성할 문서를 선택해주세요.")
     
     with col2:
@@ -389,6 +607,29 @@ def rag_page():
             # 마크다운 변환 여부 표시
             if doc.get("markdown_file_path"):
                 st.write("**마크다운 변환**: ✓")
+                
+            # RAG 생성 여부 표시
+            if doc.get("rag_created"):
+                st.write(f"**RAG 상태**: ✅ 생성됨 ({doc.get('rag_created_at', '')[:10]})")
+                st.write(f"**RAG 컬렉션**: {doc.get('rag_collection', '')}")
+                
+                # RAG 컬렉션 이름 변경 옵션
+                new_rag_collection = st.text_input(
+                    "새 RAG 컬렉션 이름",
+                    value=doc.get('rag_collection', ''),
+                    key="new_rag_collection",
+                    help="RAG 컬렉션 이름을 변경하려면 새 이름을 입력하고 다시 RAG 생성을 실행하세요."
+                )
+                if new_rag_collection and new_rag_collection != doc.get('rag_collection', ''):
+                    st.session_state.rag_collection_name = new_rag_collection
+                    st.info("컬렉션 이름이 변경되었습니다. RAG 생성 버튼을 눌러 새 컬렉션으로 임베딩하세요.")
+            else:
+                st.write("**RAG 상태**: ❌ 미생성")
+                # 문서 컬렉션 이름을 RAG 컬렉션 기본값으로 제안
+                if not st.session_state.rag_collection_name:
+                    suggested_collection = doc.get('collection_name', '')
+                    st.session_state.rag_collection_name = suggested_collection
+                    st.info(f"문서의 컬렉션 이름을 RAG 컬렉션 이름으로 사용합니다: {suggested_collection}")
             
             st.divider()
             

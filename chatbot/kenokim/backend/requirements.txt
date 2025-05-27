@@ -1,0 +1,11 @@
+fastapi
+uvicorn
+httpx
+python-dotenv
+pydantic
+sse-starlette
+uuid
+asyncio
+langchain_mcp_adapters
+langgraph
+langchain_google_genai

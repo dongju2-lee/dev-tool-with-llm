@@ -1,0 +1,13 @@
+version: "3.9"
+
+services:
+  # Sonarqube MCP (새로 개발)
+  sonarqube-mcp:
+    build:
+      context: ./sonarqube
+    environment:
+      SONARQUBE_URL: http://host.docker.internal:9000
+      SONARQUBE_TOKEN: ""
+    ports:
+      - "8092:8000"
+    restart: unless-stopped

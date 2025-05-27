@@ -1,0 +1,40 @@
+{
+  "name": "slack-mcp-server-sse",
+  "version": "1.0.0",
+  "description": "Slack MCP server with SSE transport",
+  "author": "Daniel Holzmann (https://danielholzmann.com)",
+  "repository": {
+    "url": "https://github.com/dVelopment/slack-mcp-server-sse.git"
+  },
+  "type": "module",
+  "main": "dist/index.js",
+  "bin": {
+    "slack-mcp-server-sse": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && shx chmod +x dist/*.js",
+    "start": "bun run src/index.ts",
+    "dev": "bun start",
+    "format": "prettier --write src/**/*"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.9.0",
+    "dotenv": "^16.4.7",
+    "express": "^5.1.0"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.2.9",
+    "@types/express": "^5.0.1",
+    "@types/node": "^22.14.0",
+    "prettier": "^3.5.3",
+    "shx": "^0.4.0",
+    "typescript": "^5.8.3"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  },
+  "license": "UNLICENSED"
+}

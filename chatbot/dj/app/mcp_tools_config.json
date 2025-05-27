@@ -1,6 +1,0 @@
-{
-  "k6_service": {
-    "url": "http://0.0.0.0:10001/sse",
-    "transport": "sse"
-  }
-}

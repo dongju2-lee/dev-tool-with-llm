@@ -121,6 +121,18 @@ def voice_chatbot_page():
     </head>
     <body>
         <div class="voice-container">
+            <!-- OpenAI 스타일 파도 애니메이션 - circle-container 밖으로 이동 -->
+            <div id="waveContainer" class="wave-container">
+                <div class="wave-bar idle"></div>
+                <div class="wave-bar idle"></div>
+                <div class="wave-bar idle"></div>
+                <div class="wave-bar idle"></div>
+                <div class="wave-bar idle"></div>
+                <div class="wave-bar idle"></div>
+                <div class="wave-bar idle"></div>
+                <div class="wave-bar idle"></div>
+            </div>
+            
             <div id="circleContainer" class="circle-container idle">
                 <div class="voice-circle">
                     <canvas id="audioCanvas" class="audio-canvas"></canvas>

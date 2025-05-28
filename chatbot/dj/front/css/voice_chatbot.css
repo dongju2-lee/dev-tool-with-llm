@@ -19,7 +19,8 @@ body {
     width: 200px;  /* 원 크기 축소 (300px -> 200px) */
     height: 200px; /* 원 크기 축소 (300px -> 200px) */
     position: relative;
-    margin-bottom: 60px;
+    margin-bottom: 60px; /* 마이크 버튼과의 간격 증가 (60px -> 120px) */
+    margin-top: 220px; /* 원을 아래로 이동 */
     filter: drop-shadow(0 0 15px rgba(32, 156, 238, 0.3));
     transition: all 1.2s cubic-bezier(0.34, 1.56, 0.64, 1); /* 부드러운 전환 효과 */
 }
@@ -96,7 +97,7 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    margin-top: 40px; /* 버튼 위치를 아래로 조정 */
+    margin-top: 80px; /* 마이크 버튼을 더 아래로 이동 (40px -> 80px) */
     gap: 30px;
 }
 
@@ -194,6 +195,90 @@ body {
     width: 50%;
     height: 50%;
     background: radial-gradient(circle, rgba(144, 202, 249, 0.2) 0%, rgba(109, 193, 255, 0.05) 70%);
+}
+
+/* OpenAI 스타일 파도 애니메이션 */
+.wave-container {
+    position: absolute;
+    top: 50%; /* voice-container의 중앙 기준 */
+    left: 50%;
+    transform: translate(-50%, -50%) translateY(-200px); /* 기둥을 더 위쪽으로 이동 (-140px -> -200px) */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px; /* 간격을 줄여서 더 조밀하게 */
+    width: 160px; /* 원(200px)보다 살짝 작게 설정 */
+    opacity: 1; /* 항상 보이도록 변경 */
+    transition: opacity 0.3s ease;
+    z-index: 10; /* 원 위에 표시되도록 z-index 추가 */
+    pointer-events: none; /* 클릭 이벤트 방지 */
+}
+
+.wave-container.active {
+    opacity: 1;
+}
+
+.wave-bar {
+    width: 25px; /* 기둥 너비 고정 */
+    height: 50px; /* 기본 높이를 50px로 변경 */
+    background: linear-gradient(180deg, #90c1ec 0%, #99ade6 100%);
+    border-radius: 12px; /* 25px 너비에 맞춰 둥근 모서리 조정 */
+    transform: scaleY(1); /* 기본 상태에서는 고정 크기 */
+    transition: transform 0.1s ease; /* 부드러운 전환 */
+}
+
+/* 평소 상태 - 애니메이션 없음 */
+.wave-bar.idle {
+    animation: none;
+    transform: scaleY(1);
+    height: 50px; /* idle 상태에서 50px 유지 */
+}
+
+/* 음성 감지 시 애니메이션 */
+.wave-bar.active {
+    animation: wave-animation 1.8s ease-in-out infinite;
+    height: 50px; /* active 상태에서도 기본 높이 50px 유지 */
+}
+
+.wave-bar:nth-child(1) {
+    animation-delay: 0s;
+}
+
+.wave-bar:nth-child(2) {
+    animation-delay: 0.15s;
+}
+
+.wave-bar:nth-child(3) {
+    animation-delay: 0.3s;
+}
+
+.wave-bar:nth-child(4) {
+    animation-delay: 0.45s;
+}
+
+.wave-bar:nth-child(5) {
+    animation-delay: 0.6s;
+}
+
+.wave-bar:nth-child(6) {
+    animation-delay: 0.75s;
+}
+
+.wave-bar:nth-child(7) {
+    animation-delay: 0.9s;
+}
+
+.wave-bar:nth-child(8) {
+    animation-delay: 1.05s;
+}
+
+@keyframes wave-animation {
+    0%, 100% {
+        transform: scaleY(1); /* 기본 크기 (50px) */
+    }
+    50% {
+        transform: scaleY(1.3); /* 최대 30% 증가 (50px * 1.3 = 65px) */
+    }
 }
 
 /* 별 효과 */

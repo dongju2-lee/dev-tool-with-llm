@@ -66,8 +66,9 @@ document.addEventListener('DOMContentLoaded', function() {
     const micButton = document.getElementById('micButton');
     const circleContainer = document.getElementById('circleContainer');
     const canvas = document.getElementById('audioCanvas');
+    const waveContainer = document.getElementById('waveContainer');
     
-    if (!micButton || !circleContainer || !canvas) {
+    if (!micButton || !circleContainer || !canvas || !waveContainer) {
         console.error('필수 UI 요소를 찾을 수 없습니다.');
         return;
     }
@@ -86,6 +87,55 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 호흡 효과 애니메이션 시작
     startBreathing();
+    
+    // 파도 애니메이션 시작
+    function startWaveAnimation() {
+        const waveBars = waveContainer.querySelectorAll('.wave-bar');
+        waveBars.forEach(bar => {
+            bar.classList.remove('idle');
+            bar.classList.add('active');
+        });
+        console.log('파도 애니메이션이 시작되었습니다.');
+    }
+    
+    // 파도 애니메이션 중지
+    function stopWaveAnimation() {
+        const waveBars = waveContainer.querySelectorAll('.wave-bar');
+        waveBars.forEach(bar => {
+            bar.classList.remove('active');
+            bar.classList.add('idle');
+            // idle 상태로 돌아갈 때 크기를 50px로 고정
+            bar.style.height = '50px';
+            bar.style.animationDuration = ''; // 애니메이션 속도 초기화
+        });
+        console.log('파도 애니메이션이 중지되었습니다.');
+    }
+    
+    // 파도 애니메이션 강도 조절
+    function updateWaveIntensity(voiceLevel) {
+        const waveBars = waveContainer.querySelectorAll('.wave-bar');
+        const intensity = Math.min(voiceLevel / 80, 1); // 더 민감하게 반응하도록 조정 (100 -> 80)
+        
+        waveBars.forEach((bar, index) => {
+            // 음성 감지 시에만 높이 조절
+            if (bar.classList.contains('active')) {
+                // 25px, 50px 기준으로 높이 설정 - 최대 30% 증가
+                const baseHeight = 50; // 기본 높이 50px
+                const maxHeight = 65;  // 최대 높이 65px (50px * 1.3 = 30% 증가)
+                const height = baseHeight + (maxHeight - baseHeight) * intensity;
+                bar.style.height = `${height}px`;
+                
+                // 애니메이션 속도도 조절 (더 느리게)
+                const baseSpeed = 1.8;
+                const maxSpeed = 1.2;
+                const speed = baseSpeed - (baseSpeed - maxSpeed) * intensity;
+                bar.style.animationDuration = `${speed}s`;
+            } else {
+                // idle 상태에서는 항상 50px 유지
+                bar.style.height = '50px';
+            }
+        });
+    }
     
     // 마이크 초기화 함수
     async function setupMicrophone() {
@@ -275,13 +325,19 @@ document.addEventListener('DOMContentLoaded', function() {
         };
         audio.onplay = () => {
             console.log('오디오 재생 시작');
+            // 파도 애니메이션 시작
+            startWaveAnimation();
         };
         audio.onended = () => {
             console.log('오디오 재생 완료');
+            // 파도 애니메이션 중지
+            stopWaveAnimation();
             URL.revokeObjectURL(audioUrl); // 메모리 정리
         };
         audio.play().catch(err => {
             console.error('오디오 재생 오류:', err);
+            // 오류 시에도 파도 애니메이션 중지
+            stopWaveAnimation();
         });
     }
     
@@ -392,6 +448,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 circleContainer.classList.remove('idle');
                 circleContainer.classList.add('active');
                 micButton.classList.add('active');
+                // 녹음 중일 때 파도 애니메이션 시작
+                if (isRecording) {
+                    startWaveAnimation();
+                }
+            }
+            
+            // 파도 애니메이션 강도 업데이트 (녹음 중일 때만)
+            if (isRecording) {
+                updateWaveIntensity(avgVoiceLevel);
             }
         } else {
             // 말하기 중지 상태 감지
@@ -405,6 +470,10 @@ document.addEventListener('DOMContentLoaded', function() {
                         circleContainer.classList.add('idle');
                         circleContainer.classList.remove('active');
                         micButton.classList.remove('active');
+                        // 녹음 중 말하기가 중지되면 파도 애니메이션도 중지
+                        if (isRecording) {
+                            stopWaveAnimation();
+                        }
                     }
                 }, 800);
             }

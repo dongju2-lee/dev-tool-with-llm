@@ -280,4 +280,4 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 초기화
     initMicrophone();
-}); 
+});

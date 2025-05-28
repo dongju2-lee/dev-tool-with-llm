@@ -7,9 +7,11 @@ import nest_asyncio
 
 from page_list.chatbot_page import chatbot_page
 from page_list.rag_page import rag_page
+from page_list.voice_chatbot_page import voice_chatbot_page
 from page_list.helpers import (
     CHATBOT_PAGE,
     RAG_PAGE,
+    VOICE_CHATBOT_PAGE,
 )
 from utils.logging_config import setup_logger
 
@@ -88,6 +90,11 @@ class MultiApp:
                 st.info(
                     "RAG 문서 관리 페이지입니다. 로컬 파일을 업로드하여 분석할 수 있습니다."
                 )
+            elif selected_app["title"] == VOICE_CHATBOT_PAGE:
+                # Voice Chatbot 페이지일 경우 설정 정보 표시
+                st.info(
+                    "Voice Chatbot 페이지입니다. 음성 챗봇을 사용할 수 있습니다."
+                )
 
         # 선택한 앱 실행
         selected_app["function"]()
@@ -101,6 +108,7 @@ if __name__ == "__main__":
     # 앱 등록
     app.add_app(CHATBOT_PAGE, chatbot_page)
     app.add_app(RAG_PAGE, rag_page)
+    app.add_app(VOICE_CHATBOT_PAGE, voice_chatbot_page)
 
     # 앱 실행
     app.run()

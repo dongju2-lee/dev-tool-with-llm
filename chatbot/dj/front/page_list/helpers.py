@@ -17,6 +17,7 @@ logger = setup_logger("helpers")
 # 페이지 상수
 CHATBOT_PAGE = "챗봇"
 RAG_PAGE = "RAG 문서 관리"
+VOICE_CHATBOT_PAGE = "음성 챗봇"
 
 # 모바일 서브페이지 상수
 MESSAGES_SUBPAGE = "메시지"

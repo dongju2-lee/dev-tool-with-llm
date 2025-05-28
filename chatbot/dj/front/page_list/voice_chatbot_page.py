@@ -11,6 +11,7 @@ import tempfile
 from pathlib import Path
 from loguru import logger
 import sys
+import json
 
 # 로그 설정을 위한 함수
 @st.cache_resource
@@ -33,6 +34,38 @@ def configure_logger():
     
     logger.info("로그 시스템이 초기화되었습니다.")
     return logger
+
+def save_audio_file(audio_data, file_type="wav"):
+    """
+    Base64 인코딩된 오디오 데이터를 임시 파일로 저장
+    
+    Args:
+        audio_data: Base64 인코딩된 오디오 데이터
+        file_type: 오디오 파일 타입 (기본값: wav)
+        
+    Returns:
+        임시 파일 경로
+    """
+    try:
+        # 디코딩
+        audio_bytes = base64.b64decode(audio_data)
+        
+        # 임시 디렉토리 생성
+        temp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # 고유한 파일명 생성
+        file_name = f"audio_{uuid.uuid4()}.{file_type}"
+        file_path = os.path.join(temp_dir, file_name)
+        
+        # 파일 저장
+        with open(file_path, "wb") as f:
+            f.write(audio_bytes)
+            
+        return file_path
+    except Exception as e:
+        logger.error(f"오디오 파일 저장 중 오류 발생: {str(e)}")
+        return None
 
 def voice_chatbot_page():
     """음성 챗봇 페이지 구현"""
@@ -61,6 +94,10 @@ def voice_chatbot_page():
         }
     </style>
     """, unsafe_allow_html=True)
+    
+    # 세션 상태 초기화
+    if 'audio_files' not in st.session_state:
+        st.session_state.audio_files = []
     
     # CSS 파일 로드 - 경로 문제 해결
     css_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "css", "voice_chatbot.css")
@@ -115,21 +152,6 @@ def voice_chatbot_page():
         
         <script>
             {js_content}
-            
-            // Streamlit과 통신하기 위한 코드를 수정
-            window.addEventListener('message', function(event) {{
-                if (event.data.type === 'recordingState') {{
-                    const data = {{
-                        isRecording: event.data.isRecording
-                    }};
-                    
-                    // Streamlit에 데이터 전송
-                    window.parent.postMessage({{
-                        type: 'streamlit:setComponentValue',
-                        value: data
-                    }}, '*');
-                }}
-            }});
         </script>
     </body>
     </html>
@@ -141,26 +163,84 @@ def voice_chatbot_page():
     
     # Streamlit에서 녹음 상태 확인을 위한 세션 상태 초기화
     if 'is_recording' not in st.session_state:
-        st.session_state.is_recording = True
+        st.session_state.is_recording = False
         log.info("녹음 상태가 초기화되었습니다.")
     
-    # 컴포넌트로부터 받은 값을 처리
-    if component_value and isinstance(component_value, dict) and 'isRecording' in component_value:
-        previous_state = st.session_state.is_recording
-        st.session_state.is_recording = component_value['isRecording']
+    # 컴포넌트로부터 받은 값 처리
+    if component_value and isinstance(component_value, dict):
+        # 녹음 상태 업데이트
+        if 'isRecording' in component_value:
+            previous_state = st.session_state.is_recording
+            st.session_state.is_recording = component_value['isRecording']
+            
+            # 상태가 변경된 경우에만 로그 기록
+            if previous_state != st.session_state.is_recording:
+                log.info(f"녹음 상태가 변경되었습니다: {previous_state} -> {st.session_state.is_recording}")
         
-        # 상태가 변경된 경우에만 로그 기록
-        if previous_state != st.session_state.is_recording:
-            log.info(f"녹음 상태가 변경되었습니다: {previous_state} -> {st.session_state.is_recording}")
+        # 오디오 데이터 처리
+        if 'audioData' in component_value and component_value['audioData']:
+            log.info("오디오 데이터를 수신했습니다.")
+            
+            try:
+                # 오디오 파일 저장
+                audio_type = component_value.get('type', 'wav')
+                file_path = save_audio_file(component_value['audioData'], audio_type.split('/')[-1])
+                
+                if file_path:
+                    log.info(f"오디오 파일이 저장되었습니다: {file_path}")
+                    
+                    # 세션에 파일 경로 저장
+                    st.session_state.audio_files.append(file_path)
+                    
+                    # 2초 후에 오디오 재생
+                    with st.spinner("녹음된 오디오를 처리 중입니다..."):
+                        log.debug("오디오 처리 딜레이 2초 시작")
+                        time.sleep(2)
+                        
+                        # 오디오 재생 UI 표시
+                        st.audio(file_path)
+                        log.info("오디오 재생 UI가 표시되었습니다.")
+                        
+                        # 여기에 나중에 음성인식 로직 추가 가능
+                        # TODO: 음성인식 API 연동
+            except Exception as e:
+                log.error(f"오디오 데이터 처리 중 오류 발생: {str(e)}")
     
     # 디버깅용 (실제 앱에서는 숨김 처리 가능)
     with st.expander("디버깅 정보", expanded=False):
         st.write("녹음 상태:", "활성화" if st.session_state.is_recording else "비활성화")
         
+        # 저장된 오디오 파일 목록
+        if st.session_state.audio_files:
+            st.write("저장된 오디오 파일:")
+            for idx, file_path in enumerate(st.session_state.audio_files):
+                st.write(f"{idx+1}. {os.path.basename(file_path)}")
+                if os.path.exists(file_path):
+                    st.audio(file_path, format='audio/wav')
+        
+        # 임시 파일 정리 버튼
+        if st.button("임시 파일 정리"):
+            log.info("임시 파일 정리를 시작합니다.")
+            temp_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp")
+            
+            if os.path.exists(temp_dir):
+                # 임시 파일 삭제
+                for file_name in os.listdir(temp_dir):
+                    if file_name.startswith("audio_"):
+                        try:
+                            os.remove(os.path.join(temp_dir, file_name))
+                            log.debug(f"파일 삭제: {file_name}")
+                        except Exception as e:
+                            log.error(f"파일 삭제 중 오류: {str(e)}")
+            
+            # 세션 상태 초기화
+            st.session_state.audio_files = []
+            log.info("임시 파일 정리가 완료되었습니다.")
+            st.success("임시 파일이 정리되었습니다.")
+        
         if st.button("음성 처리 테스트"):
             log.info("음성 처리 테스트 버튼이 클릭되었습니다.")
             with st.spinner("음성을 처리 중입니다..."):
-                # 실제로는 여기서 음성 인식 및 챗봇 처리 로직이 필요함
                 log.debug("음성 처리를 시뮬레이션합니다...")
                 time.sleep(2)
                 

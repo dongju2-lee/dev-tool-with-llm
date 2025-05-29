@@ -365,7 +365,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 fileName: fileName,
                 timestamp: timestamp,
                 audioBase64: base64Data,
-                size: audioBlob.size
+                size: audioBlob.size,
+                processed: false
             };
             
             console.log('Streamlit으로 오디오 데이터 전송:', {
@@ -374,7 +375,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 size: audioBlob.size
             });
             
-            notifyStreamlit(audioData);
+            // 개선된 통신 함수 사용
+            sendToStreamlit(audioData);
         };
         
         reader.onerror = (error) => {
@@ -387,54 +389,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // Streamlit에 상태 알림
     function notifyStreamlit(data) {
-        console.log('notifyStreamlit 호출됨, 데이터:', data);
-        
-        // Streamlit 컴포넌트와의 통신 방법 개선
-        try {
-            // 방법 1: Streamlit.setComponentValue 사용 (권장)
-            if (window.Streamlit && window.Streamlit.setComponentValue) {
-                console.log('Streamlit.setComponentValue 사용');
-                window.Streamlit.setComponentValue(data);
-                console.log('Streamlit.setComponentValue 전송 완료');
-                return;
-            }
-            
-            // 방법 2: parent.postMessage 사용 (백업) - 더 구체적인 타겟 지정
-            if (window.parent && window.parent !== window) {
-                const message = {
-                    type: 'streamlit:setComponentValue',
-                    value: data
-                };
-                console.log('postMessage로 전송할 메시지:', message);
-                
-                // 여러 방법으로 메시지 전송 시도
-                window.parent.postMessage(message, '*');
-                window.parent.postMessage(data, '*');  // 직접 데이터도 전송
-                
-                // iframe 내부에서 top으로도 전송
-                if (window.top && window.top !== window) {
-                    window.top.postMessage(message, '*');
-                    window.top.postMessage(data, '*');
-                }
-                
-                console.log('postMessage 전송 완료 (parent, top)');
-                return;
-            }
-            
-            // 방법 3: 직접 이벤트 발생 (최후 수단)
-            const event = new CustomEvent('streamlit:setComponentValue', {
-                detail: data
-            });
-            window.dispatchEvent(event);
-            document.dispatchEvent(event);
-            console.log('CustomEvent 발생 완료');
-            
-            // 방법 4: 글로벌 변수에 저장 (Streamlit이 폴링할 수 있도록)
-            window.streamlitAudioData = data;
-            console.log('글로벌 변수에 오디오 데이터 저장 완료');
-            
-        } catch (error) {
-            console.error('Streamlit 통신 오류:', error);
+        if (window.parent && window.parent.postMessage) {
+            window.parent.postMessage({
+                type: 'streamlit:setComponentValue',
+                value: data
+            }, '*');
         }
     }
     

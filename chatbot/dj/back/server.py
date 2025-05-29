@@ -28,6 +28,16 @@ class ChatResponse(BaseModel):
     # agent_mode: str
 
 
+@app.get("/health")
+async def health_check():
+    """서버 상태 확인"""
+    return {
+        "status": "healthy",
+        "service": "chatbot",
+        "graph_runner_ready": runner is not None
+    }
+
+
 @app.post(
     "/ask", response_model=ChatResponse, summary="Process chat messages"
 )

@@ -293,6 +293,80 @@ def play_audio_from_base64(audio_base64):
         logger.error(f"오디오 재생 중 오류: {str(e)}")
         st.error(f"❌ 오디오 재생 실패: {str(e)}")
 
+def send_message_to_chatbot(message, session_id=None):
+    """
+    챗봇 API로 메시지를 전송하여 답변을 받음
+    
+    Args:
+        message: 사용자 메시지
+        session_id: 세션 ID (선택사항)
+        
+    Returns:
+        dict: 챗봇 응답 결과
+    """
+    try:
+        # 챗봇 서버 URL
+        chatbot_server_url = "http://localhost:8800/ask"
+        
+        # 요청 데이터 준비
+        payload = {
+            "message": message
+        }
+        
+        if session_id:
+            payload["session_id"] = session_id
+        
+        # 에이전트 모드 추가 (기본값: general)
+        payload["agent_mode"] = "general"
+        
+        logger.info(f"챗봇 API로 메시지 전송: '{message}'")
+        
+        # 챗봇 서버로 POST 요청
+        response = requests.post(
+            chatbot_server_url,
+            json=payload,
+            timeout=30  # 30초 타임아웃
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            chatbot_response = result.get('response', '')
+            logger.info(f"챗봇 응답 수신: '{chatbot_response[:100]}...'")
+            return {
+                "success": True,
+                "response": chatbot_response,
+                "session_id": result.get('session_id', session_id)
+            }
+        else:
+            error_msg = f"챗봇 서버 오류: {response.status_code} - {response.text}"
+            logger.error(error_msg)
+            return {
+                "success": False,
+                "error": error_msg
+            }
+            
+    except requests.exceptions.ConnectionError:
+        error_msg = "챗봇 서버에 연결할 수 없습니다. 서버가 실행 중인지 확인하세요."
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+    except requests.exceptions.Timeout:
+        error_msg = "챗봇 서버 응답 시간이 초과되었습니다."
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+    except Exception as e:
+        error_msg = f"챗봇 요청 중 오류 발생: {str(e)}"
+        logger.error(error_msg)
+        return {
+            "success": False,
+            "error": error_msg
+        }
+
 def voice_chatbot_page():
     """음성 챗봇 페이지 구현 - 심플 버전"""
     # 로거 설정
@@ -301,42 +375,51 @@ def voice_chatbot_page():
     
     # 페이지 설정
     st.title("🎤 음성 챗봇")
-    st.markdown("음성을 녹음하면 자동으로 텍스트로 변환됩니다.")
+    st.markdown("음성으로 질문하면 AI가 답변해드립니다!")
     st.markdown("---")
     
     # 세션 상태 초기화
     if 'transcripts' not in st.session_state:
         st.session_state.transcripts = []
+    if 'chatbot_session_id' not in st.session_state:
+        st.session_state.chatbot_session_id = None
     
     # temp_audio 디렉토리 설정
     temp_audio_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "temp_audio")
     os.makedirs(temp_audio_dir, exist_ok=True)
     
-    # STT 서버 상태 확인
+    # 서버 상태 확인
     try:
-        response = requests.get("http://localhost:8504/health", timeout=2)
-        if response.status_code == 200:
-            health_data = response.json()
+        # 음성 서버 상태 확인
+        voice_response = requests.get("http://localhost:8504/health", timeout=2)
+        if voice_response.status_code == 200:
+            health_data = voice_response.json()
             stt_ready = health_data.get("speech_client_ready", False)
             tts_ready = health_data.get("tts_client_ready", False)
-            server_ready = stt_ready and tts_ready
+            voice_server_ready = stt_ready and tts_ready
         else:
-            server_ready = False
+            voice_server_ready = False
             stt_ready = False
             tts_ready = False
     except:
-        server_ready = False
+        voice_server_ready = False
         stt_ready = False
         tts_ready = False
     
+    try:
+        # 챗봇 서버 상태 확인
+        chatbot_response = requests.get("http://localhost:8800/health", timeout=2)
+        chatbot_ready = chatbot_response.status_code == 200
+    except:
+        chatbot_ready = False
+    
     # 상태 표시
-    col1, col2, col3 = st.columns(3)
+    col1, col2, col3, col4 = st.columns(4)
     with col1:
-        if server_ready:
+        if voice_server_ready:
             st.success("🟢 음성 서버 연결됨")
         else:
             st.error("🔴 음성 서버 연결 안됨")
-        st.info(f"🎤 처리된 음성: {len(st.session_state.transcripts)}개")
     
     with col2:
         if stt_ready:
@@ -350,17 +433,30 @@ def voice_chatbot_page():
         else:
             st.error("🔊 TTS 준비 안됨")
     
+    with col4:
+        if chatbot_ready:
+            st.success("🤖 챗봇 준비됨")
+        else:
+            st.error("🤖 챗봇 준비 안됨")
+    
+    st.info(f"🎤 대화 기록: {len(st.session_state.transcripts)}개")
+    
     st.markdown("---")
     
     # 메인 녹음 영역
-    st.subheader("🎙️ 음성 녹음")
+    st.subheader("🎙️ 음성으로 질문하기")
+    
+    server_ready = voice_server_ready and chatbot_ready
     
     if not server_ready:
-        st.warning("⚠️ STT 서버를 먼저 실행해주세요:")
-        st.code("cd /Users/idongju/dev/dev-tool-with-llm/chatbot/dj/voice-back && python voice_server.py")
+        st.warning("⚠️ 서버를 먼저 실행해주세요:")
+        if not voice_server_ready:
+            st.code("cd /Users/idongju/dev/dev-tool-with-llm/chatbot/dj/voice-back && python voice_server.py")
+        if not chatbot_ready:
+            st.code("챗봇 서버 실행 필요 (포트 8800)")
     else:
         # 오디오 녹음 컴포넌트
-        audio_bytes = st.audio_input("🎤 녹음 버튼을 클릭하여 음성을 녹음하세요")
+        audio_bytes = st.audio_input("🎤 녹음 버튼을 클릭하여 질문을 말씀하세요")
         
         if audio_bytes is not None:
             st.success("🎵 음성이 녹음되었습니다!")
@@ -381,7 +477,7 @@ def voice_chatbot_page():
             log.info(f"오디오 파일 저장: {file_path}")
             
             # 1초 대기 후 STT 처리
-            with st.spinner("🔄 1초 후 음성을 텍스트로 변환합니다..."):
+            with st.spinner("🔄 음성을 텍스트로 변환 중..."):
                 time.sleep(1)  # 1초 대기
                 
                 try:
@@ -399,38 +495,63 @@ def voice_chatbot_page():
                         transcript = stt_result.get('transcript', '')
                         confidence = stt_result.get('confidence', 0)
                         
-                        # 결과 저장
-                        st.session_state.transcripts.append({
-                            'text': transcript,
-                            'confidence': confidence,
-                            'timestamp': time.time(),
-                            'filename': filename
-                        })
-                        
-                        # 결과 표시
+                        # STT 결과 표시
                         st.success("🎤 음성 인식 완료!")
-                        st.markdown(f"### 📝 인식된 텍스트:")
+                        st.markdown(f"### 📝 인식된 질문:")
                         st.markdown(f"**{transcript}**")
                         st.markdown(f"*신뢰도: {confidence:.2f}*")
                         
                         log.info(f"음성 인식 성공: '{transcript}' (신뢰도: {confidence:.2f})")
                         
-                        # TTS 변환 및 재생
-                        with st.spinner("🔊 음성으로 변환 중..."):
-                            tts_result = send_text_to_tts_server(transcript)
+                        # 챗봇에 질문 전송
+                        with st.spinner("🤖 AI가 답변을 생성 중..."):
+                            chatbot_result = send_message_to_chatbot(transcript, st.session_state.chatbot_session_id)
                             
-                            if tts_result.get('success'):
-                                audio_data = tts_result.get('audio_data')
-                                st.success("🔊 음성 변환 완료! 자동 재생됩니다.")
+                            if chatbot_result.get('success'):
+                                chatbot_response = chatbot_result.get('response', '')
+                                session_id = chatbot_result.get('session_id')
                                 
-                                # 자동 재생
-                                play_audio_from_base64(audio_data)
+                                # 세션 ID 업데이트
+                                if session_id:
+                                    st.session_state.chatbot_session_id = session_id
                                 
-                                log.info("TTS 변환 및 재생 완료")
+                                # 챗봇 응답 표시
+                                st.success("🤖 AI 답변 완료!")
+                                st.markdown(f"### 💬 AI 답변:")
+                                st.markdown(f"**{chatbot_response}**")
+                                
+                                log.info(f"챗봇 응답 수신: '{chatbot_response[:100]}...'")
+                                
+                                # TTS 변환 및 재생
+                                with st.spinner("🔊 답변을 음성으로 변환 중..."):
+                                    tts_result = send_text_to_tts_server(chatbot_response)
+                                    
+                                    if tts_result.get('success'):
+                                        audio_data = tts_result.get('audio_data')
+                                        st.success("🔊 음성 변환 완료! 자동 재생됩니다.")
+                                        
+                                        # 자동 재생
+                                        play_audio_from_base64(audio_data)
+                                        
+                                        log.info("TTS 변환 및 재생 완료")
+                                    else:
+                                        tts_error = tts_result.get('error', '알 수 없는 TTS 오류')
+                                        st.warning(f"⚠️ 음성 변환 실패: {tts_error}")
+                                        log.error(f"TTS 변환 실패: {tts_error}")
+                                
+                                # 대화 기록 저장
+                                st.session_state.transcripts.append({
+                                    'question': transcript,
+                                    'answer': chatbot_response,
+                                    'confidence': confidence,
+                                    'timestamp': time.time(),
+                                    'filename': filename
+                                })
+                                
                             else:
-                                tts_error = tts_result.get('error', '알 수 없는 TTS 오류')
-                                st.warning(f"⚠️ 음성 변환 실패: {tts_error}")
-                                log.error(f"TTS 변환 실패: {tts_error}")
+                                chatbot_error = chatbot_result.get('error', '알 수 없는 챗봇 오류')
+                                st.error(f"❌ 챗봇 응답 실패: {chatbot_error}")
+                                log.error(f"챗봇 응답 실패: {chatbot_error}")
                         
                         # 저장된 파일 삭제 (처리 완료 후)
                         try:
@@ -454,76 +575,29 @@ def voice_chatbot_page():
                     # 오류 발생 시에도 파일 유지 (디버깅용)
                     st.info(f"⚠️ 오류 발생한 파일은 디버깅을 위해 보관됩니다: {filename}")
     
-    # 이전 결과 표시
+    # 이전 대화 기록 표시
     if st.session_state.transcripts:
         st.markdown("---")
-        st.subheader("📋 이전 음성 인식 결과")
+        st.subheader("💬 이전 대화 기록")
         
         # 최근 5개만 표시
-        recent_transcripts = list(reversed(st.session_state.transcripts))[:5]
+        recent_conversations = list(reversed(st.session_state.transcripts))[:5]
         
-        for idx, transcript_data in enumerate(recent_transcripts):
-            with st.expander(f"🎤 음성 {len(st.session_state.transcripts) - idx}", expanded=(idx == 0)):
-                st.markdown(f"**텍스트:** {transcript_data['text']}")
-                st.markdown(f"**신뢰도:** {transcript_data['confidence']:.2f}")
+        for idx, conversation in enumerate(recent_conversations):
+            with st.expander(f"🗣️ 대화 {len(st.session_state.transcripts) - idx}", expanded=(idx == 0)):
+                st.markdown(f"**👤 질문:** {conversation['question']}")
+                st.markdown(f"**🤖 답변:** {conversation['answer']}")
+                st.markdown(f"**🎯 신뢰도:** {conversation['confidence']:.2f}")
                 
-                timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(transcript_data['timestamp']))
-                st.markdown(f"**시간:** {timestamp}")
+                timestamp = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(conversation['timestamp']))
+                st.markdown(f"**⏰ 시간:** {timestamp}")
                 
-                if 'filename' in transcript_data:
-                    st.markdown(f"**파일:** {transcript_data['filename']}")
+                if 'filename' in conversation:
+                    st.markdown(f"**📁 파일:** {conversation['filename']}")
         
-        # 결과 초기화 버튼
-        if st.button("🗑️ 모든 결과 삭제"):
+        # 대화 기록 초기화 버튼
+        if st.button("🗑️ 모든 대화 기록 삭제"):
             st.session_state.transcripts = []
-            st.success("✅ 모든 결과가 삭제되었습니다.")
+            st.session_state.chatbot_session_id = None
+            st.success("✅ 모든 대화 기록이 삭제되었습니다.")
             st.rerun()
-    
-    # 디버깅 정보 (간단하게)
-    with st.expander("🔧 디버깅 정보"):
-        # temp_audio 디렉토리 상태
-        wav_files = [f for f in os.listdir(temp_audio_dir) if f.endswith('.wav')]
-        st.write(f"📁 temp_audio 디렉토리: {len(wav_files)}개 파일 대기 중")
-        
-        if wav_files:
-            st.write("대기 중인 파일:")
-            for file in wav_files[:3]:  # 최대 3개만 표시
-                st.write(f"- {file}")
-            if len(wav_files) > 3:
-                st.write(f"... 외 {len(wav_files) - 3}개")
-        
-        # 수동 파일 처리 버튼
-        if st.button("🔄 대기 중인 파일 처리"):
-            if wav_files:
-                processed_files = process_audio_files()
-                if processed_files:
-                    for result in processed_files:
-                        if result['success']:
-                            # 결과를 세션에 추가
-                            st.session_state.transcripts.append({
-                                'text': result['transcript'],
-                                'confidence': result['confidence'],
-                                'timestamp': time.time(),
-                                'filename': result['file']
-                            })
-                            st.success(f"✅ {result['file']}: {result['transcript']}")
-                        else:
-                            st.error(f"❌ {result['file']}: {result['error']}")
-                    st.rerun()
-            else:
-                st.info("처리할 파일이 없습니다.")
-        
-        # STT 서버 테스트
-        if st.button("🔗 STT 서버 테스트"):
-            try:
-                response = requests.get("http://localhost:8504/health", timeout=5)
-                if response.status_code == 200:
-                    result = response.json()
-                    if result.get("speech_client_ready"):
-                        st.success("✅ STT 서버 정상 작동 중")
-                    else:
-                        st.warning("⚠️ Google Speech 클라이언트 준비 안됨")
-                else:
-                    st.error(f"❌ 서버 오류: {response.status_code}")
-            except:
-                st.error("❌ STT 서버에 연결할 수 없습니다.")

@@ -343,29 +343,98 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 오디오 서버로 전송
     function sendAudioToServer(audioBlob) {
-        // FormData 생성
-        const formData = new FormData();
-        formData.append('audio', audioBlob, 'recording.wav');
+        console.log('sendAudioToServer 호출됨, audioBlob 크기:', audioBlob.size);
         
-        // Streamlit에 오디오 데이터 전송
+        // 현재 시간을 기반으로 고유한 파일명 생성
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const fileName = `audio_${timestamp}.wav`;
+        
+        console.log('생성할 파일명:', fileName);
+        
+        // Blob을 Base64로 변환하여 Streamlit으로 전송
         const reader = new FileReader();
         reader.onloadend = () => {
-            const base64Audio = reader.result.split(',')[1];
-            notifyStreamlit({
-                audioData: base64Audio,
-                type: 'audio/wav'
+            // Base64 데이터 추출 (data:audio/wav;base64, 부분 제거)
+            const base64Data = reader.result.split(',')[1];
+            
+            console.log('Base64 변환 완료, 데이터 길이:', base64Data.length);
+            
+            // Streamlit에 오디오 데이터 전송
+            const audioData = {
+                type: 'audio_data',
+                fileName: fileName,
+                timestamp: timestamp,
+                audioBase64: base64Data,
+                size: audioBlob.size
+            };
+            
+            console.log('Streamlit으로 오디오 데이터 전송:', {
+                fileName: fileName,
+                dataLength: base64Data.length,
+                size: audioBlob.size
             });
+            
+            notifyStreamlit(audioData);
         };
+        
+        reader.onerror = (error) => {
+            console.error('Base64 변환 오류:', error);
+        };
+        
+        // Blob을 Base64로 변환 시작
         reader.readAsDataURL(audioBlob);
     }
     
     // Streamlit에 상태 알림
     function notifyStreamlit(data) {
-        if (window.parent && window.parent.postMessage) {
-            window.parent.postMessage({
-                type: 'streamlit:setComponentValue',
-                value: data
-            }, '*');
+        console.log('notifyStreamlit 호출됨, 데이터:', data);
+        
+        // Streamlit 컴포넌트와의 통신 방법 개선
+        try {
+            // 방법 1: Streamlit.setComponentValue 사용 (권장)
+            if (window.Streamlit && window.Streamlit.setComponentValue) {
+                console.log('Streamlit.setComponentValue 사용');
+                window.Streamlit.setComponentValue(data);
+                console.log('Streamlit.setComponentValue 전송 완료');
+                return;
+            }
+            
+            // 방법 2: parent.postMessage 사용 (백업) - 더 구체적인 타겟 지정
+            if (window.parent && window.parent !== window) {
+                const message = {
+                    type: 'streamlit:setComponentValue',
+                    value: data
+                };
+                console.log('postMessage로 전송할 메시지:', message);
+                
+                // 여러 방법으로 메시지 전송 시도
+                window.parent.postMessage(message, '*');
+                window.parent.postMessage(data, '*');  // 직접 데이터도 전송
+                
+                // iframe 내부에서 top으로도 전송
+                if (window.top && window.top !== window) {
+                    window.top.postMessage(message, '*');
+                    window.top.postMessage(data, '*');
+                }
+                
+                console.log('postMessage 전송 완료 (parent, top)');
+                return;
+            }
+            
+            // 방법 3: 직접 이벤트 발생 (최후 수단)
+            const event = new CustomEvent('streamlit:setComponentValue', {
+                detail: data
+            });
+            window.dispatchEvent(event);
+            document.dispatchEvent(event);
+            console.log('CustomEvent 발생 완료');
+            
+            // 방법 4: 글로벌 변수에 저장 (Streamlit이 폴링할 수 있도록)
+            window.streamlitAudioData = data;
+            console.log('글로벌 변수에 오디오 데이터 저장 완료');
+            
+        } catch (error) {
+            console.error('Streamlit 통신 오류:', error);
         }
     }
     

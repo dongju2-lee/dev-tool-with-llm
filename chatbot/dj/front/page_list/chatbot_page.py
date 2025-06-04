@@ -20,6 +20,7 @@ AGENT_SERVER_HOST = os.environ.get("AGENT_SERVER_HOST", "http://localhost:8800")
 AGENT_MODES = {
     "general": "general",  
     "research": "research",  
+    "report": "report",
 }
 
 
@@ -96,6 +97,7 @@ def render_sidebar():
         mode_descriptions = {
             "general": "일상적인 도움이 필요할 때 사용하는 표준 모드입니다.",
             "research": "공부, 자료 검색, 학습 일정 관리에 도움을 주는 모드입니다.",
+            "report": "시스템 분석, 성능 리포트, 장애 분석 리포트를 생성하는 모드입니다.",
         }
 
         st.info(mode_descriptions[st.session_state.agent_mode])

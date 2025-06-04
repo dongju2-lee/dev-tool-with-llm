@@ -1,3 +1,30 @@
+// Agent Mode 관리
+let currentAgentMode = "general"; // 기본값은 general
+let currentSessionId = null; // 현재 세션 ID 추적
+
+// Agent Mode 초기화 함수 (세션 시작 시 호출)
+function resetAgentMode() {
+    currentAgentMode = "general";
+    console.log("Agent Mode 초기화:", currentAgentMode);
+}
+
+// Agent Mode 업데이트 함수
+function updateAgentMode(newMode) {
+    if (newMode && newMode !== currentAgentMode) {
+        console.log(`Agent Mode 변경: ${currentAgentMode} → ${newMode}`);
+        currentAgentMode = newMode;
+    }
+}
+
+// 세션 변경 감지 및 Agent Mode 초기화
+function checkSessionChange(sessionId) {
+    if (sessionId && sessionId !== currentSessionId) {
+        console.log(`세션 변경 감지: ${currentSessionId} → ${sessionId}`);
+        currentSessionId = sessionId;
+        resetAgentMode();
+    }
+}
+
 // STT 서버로 오디오 전송
 async function sendAudioToSTTServer(audioBase64) {
   try {
@@ -39,6 +66,7 @@ async function sendMessageToChatbot(message) {
     console.log("  → 챗봇 서버로 요청 전송 시작...");
     console.log("  → 서버 URL:", `${AGENT_SERVER_HOST}/ask`);
     console.log("  → 메시지:", message);
+    console.log("  → 현재 Agent Mode:", currentAgentMode);
 
     const response = await fetch(`${AGENT_SERVER_HOST}/ask`, {
       method: "POST",
@@ -48,7 +76,7 @@ async function sendMessageToChatbot(message) {
       },
       body: JSON.stringify({
         message: message,
-        agent_mode: "general",
+        agent_mode: currentAgentMode,
       }),
     });
 
@@ -62,6 +90,12 @@ async function sendMessageToChatbot(message) {
 
     const result = await response.json();
     console.log("  → 챗봇 서버 응답 성공", result);
+    
+    // 서버 응답에서 agent_mode 업데이트
+    if (result.agent_mode) {
+      updateAgentMode(result.agent_mode);
+    }
+    
     return result;
   } catch (error) {
     console.error("  → 챗봇 요청 실패:", error.message);
@@ -204,4 +238,8 @@ async function processVoicePipeline(audioBlob) {
     updateMicButtonState();
     setDotsIdle(); // 오류 시 idle 상태로 복귀
   }
-} 
+}
+
+// 전역 함수로 노출 (Streamlit에서 호출 가능)
+window.resetAgentMode = resetAgentMode;
+window.checkSessionChange = checkSessionChange; 

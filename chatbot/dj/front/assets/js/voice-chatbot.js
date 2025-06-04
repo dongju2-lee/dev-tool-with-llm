@@ -44,6 +44,9 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
+  // Agent Mode 초기화
+  resetAgentMode();
+  
   initDotsContainer();
   createDots(400); // 점 생성
   setDotsIdle(); // 평상시 상태로 설정

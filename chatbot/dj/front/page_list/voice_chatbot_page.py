@@ -47,7 +47,8 @@ def voice_chatbot_page():
         "animations.css", 
         "dots.css",
         "button.css",
-        "effects.css"
+        "effects.css",
+        "sse-notifications.css"
     ]
     
     css_content = ""
@@ -70,6 +71,7 @@ def voice_chatbot_page():
         "dots-manager.js", 
         "api-client.js",
         "ui-controller.js",
+        "sse-client.js",
         "voice-chatbot.js"
     ]
     
@@ -149,6 +151,15 @@ def voice_chatbot_page():
                         <line x1="8" y1="23" x2="16" y2="23"></line>
                     </svg>
                 </button>
+            </div>
+        </div>
+        
+        <!-- SSE 상태 표시 -->
+        <div id="sse-status" class="sse-status sse-status-disconnected" title="SSE 연결 대기 중...">
+            <div class="sse-status-icon">
+                <svg viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 19V20H3V19L5 17V11C5 7.9 7 5.2 10 4.3V4C10 2.9 10.9 2 12 2S14 2.9 14 4V4.3C17 5.2 19 7.9 19 11V17L21 19ZM12 22C10.9 22 10 21.1 10 20H14C14 21.1 13.1 22 12 22Z"/>
+                </svg>
             </div>
         </div>
        

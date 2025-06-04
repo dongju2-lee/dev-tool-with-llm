@@ -49,4 +49,8 @@ document.addEventListener("DOMContentLoaded", function () {
   setDotsIdle(); // 평상시 상태로 설정
   startBreathing(); // 호흡 애니메이션 시작
   setupMicrophone(); // 마이크 초기화
+  
+  // SSE 연결 초기화
+  console.log("SSE 클라이언트 연결 시작...");
+  connectSSE();
 }); 

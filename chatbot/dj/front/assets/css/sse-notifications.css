@@ -1,0 +1,257 @@
+/* SSE 알림 스타일 */
+.sse-notifications-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 10000;
+    max-width: 400px;
+    pointer-events: none;
+}
+
+.sse-notification {
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    margin-bottom: 12px;
+    padding: 16px;
+    transform: translateX(100%);
+    opacity: 0;
+    transition: all 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+    pointer-events: auto;
+    max-width: 100%;
+    word-wrap: break-word;
+}
+
+.sse-notification.sse-notification-show {
+    transform: translateX(0);
+    opacity: 1;
+}
+
+.sse-notification-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.sse-notification-icon {
+    font-size: 18px;
+    margin-right: 8px;
+}
+
+.sse-notification-title {
+    font-weight: 600;
+    font-size: 14px;
+    color: #1f2937;
+    flex: 1;
+}
+
+.sse-notification-close {
+    background: none;
+    border: none;
+    font-size: 18px;
+    color: #6b7280;
+    cursor: pointer;
+    padding: 0;
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    transition: all 0.2s ease;
+}
+
+.sse-notification-close:hover {
+    background: rgba(0, 0, 0, 0.1);
+    color: #374151;
+}
+
+.sse-notification-message {
+    font-size: 13px;
+    color: #4b5563;
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+
+.sse-notification-time {
+    font-size: 11px;
+    color: #9ca3af;
+    text-align: right;
+}
+
+/* 알림 타입별 스타일 */
+.sse-notification-info {
+    border-left: 4px solid #3b82f6;
+}
+
+.sse-notification-info .sse-notification-title {
+    color: #1e40af;
+}
+
+.sse-notification-success {
+    border-left: 4px solid #10b981;
+}
+
+.sse-notification-success .sse-notification-title {
+    color: #047857;
+}
+
+.sse-notification-warning {
+    border-left: 4px solid #f59e0b;
+}
+
+.sse-notification-warning .sse-notification-title {
+    color: #d97706;
+}
+
+.sse-notification-error {
+    border-left: 4px solid #ef4444;
+}
+
+.sse-notification-error .sse-notification-title {
+    color: #dc2626;
+}
+
+.sse-notification-voice_status {
+    border-left: 4px solid #8b5cf6;
+}
+
+.sse-notification-voice_status .sse-notification-title {
+    color: #7c3aed;
+}
+
+.sse-notification-connection {
+    border-left: 4px solid #06b6d4;
+}
+
+.sse-notification-connection .sse-notification-title {
+    color: #0891b2;
+}
+
+/* SSE 상태 표시 */
+.sse-status {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    padding: 10px;
+    border-radius: 50%;
+    z-index: 9999;
+    transition: all 0.3s ease;
+    backdrop-filter: blur(10px);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    user-select: none;
+    width: 40px;
+    height: 40px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.sse-status-icon {
+    width: 20px;
+    height: 20px;
+    transition: all 0.3s ease;
+}
+
+.sse-status-icon svg {
+    width: 100%;
+    height: 100%;
+    fill: currentColor;
+}
+
+.sse-status-connected {
+    background: rgba(115, 208, 244, 0.95);
+    color: white;
+    border: 2px solid rgba(115, 208, 244, 0.95);
+}
+
+.sse-status-disconnected {
+    background: rgba(239, 68, 68, 0.95);
+    color: white;
+    border: 2px solid rgba(239, 68, 68, 0.8);
+}
+
+.sse-status-error {
+    background: rgba(239, 68, 68, 0.95);
+    color: white;
+    border: 2px solid rgba(239, 68, 68, 0.8);
+    animation: pulse-error 2s infinite;
+}
+
+/* 오류 상태 펄스 애니메이션 */
+@keyframes pulse-error {
+    0%, 100% { 
+        opacity: 1; 
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    50% { 
+        opacity: 0.8; 
+        transform: scale(1.1);
+        box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
+    }
+}
+
+/* 연결 성공 시 반짝임 효과 */
+.sse-status-connected.sse-status-just-connected {
+    animation: flash-success 0.8s ease-out;
+}
+
+@keyframes flash-success {
+    0% { 
+        background: rgba(115, 208, 244, 0.95);
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+    50% { 
+        background: rgb(128, 218, 238);
+        transform: scale(1.2);
+        box-shadow: 0 8px 25px rgba(128, 218, 238);
+    }
+    100% { 
+        background: rgba(115, 208, 244, 0.95);
+        transform: scale(1);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    }
+}
+
+/* 호버 효과 */
+.sse-status:hover {
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(0, 0, 0, 0.2);
+}
+
+/* 애니메이션 효과 */
+@keyframes slideInRight {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOutRight {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+.sse-notification-enter {
+    animation: slideInRight 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.sse-notification-exit {
+    animation: slideOutRight 0.3s cubic-bezier(0.23, 1, 0.32, 1);
+} 

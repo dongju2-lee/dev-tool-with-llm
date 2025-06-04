@@ -5,6 +5,8 @@ import uvicorn
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
+from fastapi.middleware.cors import CORSMiddleware
+
 from utils.graph_runner import GraphRunner
 
 import logging
@@ -13,6 +15,15 @@ logger = logging.getLogger("server")
 logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(title="Async Cooking Assistant")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 runner = GraphRunner()
 
 

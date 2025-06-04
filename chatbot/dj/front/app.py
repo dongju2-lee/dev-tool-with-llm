@@ -8,12 +8,10 @@ import nest_asyncio
 from page_list.chatbot_page import chatbot_page
 from page_list.rag_page import rag_page
 from page_list.voice_chatbot_page import voice_chatbot_page
-from page_list.voice_chatbot_page_using_js import dynamic_voice_chatbot_page
 from page_list.helpers import (
     CHATBOT_PAGE,
     RAG_PAGE,
     VOICE_CHATBOT_PAGE,
-    DYNAMIC_UI_PAGE,
 )
 from utils.logging_config import setup_logger
 
@@ -116,7 +114,6 @@ if __name__ == "__main__":
     app.add_app(CHATBOT_PAGE, chatbot_page)
     app.add_app(RAG_PAGE, rag_page)
     app.add_app(VOICE_CHATBOT_PAGE, voice_chatbot_page)
-    app.add_app(DYNAMIC_UI_PAGE, dynamic_voice_chatbot_page)
 
     # 앱 실행
     app.run()

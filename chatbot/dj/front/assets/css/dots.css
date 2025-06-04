@@ -1,0 +1,172 @@
+.dots-container {
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    top: 0;
+    left: 0;
+    z-index: 2;
+}
+
+.dot {
+    position: absolute;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #3b82f6;
+    transition: all 3s cubic-bezier(0.23, 1, 0.32, 1);
+    will-change: transform, left, top, opacity;
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.4);
+}
+
+/* === 1단계: 평상시 - 원형 배치 시스템 호흡 === */
+.dots-container.idle .dot {
+    background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    animation: gentle-pulse 5s ease-in-out infinite;
+    opacity: 0.8;
+}
+
+/* === 2단계: 사용자 발화 - 원이 1cm 정도 더 크게 확장 === */
+.dots-container.speaking .dot {
+    background: linear-gradient(135deg, #d8f7a0, #acfe9b);
+    opacity: 0.9;
+    animation: listening-expansion 2.5s ease-in-out infinite;
+}
+
+/* === 3단계: STT 처리 중 - 스피너 로딩 효과 === */
+.dots-container.processing .dot {
+    background: linear-gradient(135deg, #d8f7a0, #acfe9b);
+    opacity: 0.8;
+    animation: spinner-rotation 2s linear infinite;
+}
+
+/* 스피너 효과를 위한 원형 배치 */
+.dots-container.processing .dot:nth-child(8n+1) {
+    left: calc(50% + 90px * cos(0deg)) !important;
+    top: calc(50% + 90px * sin(0deg)) !important;
+    animation-delay: 0s;
+}
+
+.dots-container.processing .dot:nth-child(8n+2) {
+    left: calc(50% + 90px * cos(45deg)) !important;
+    top: calc(50% + 90px * sin(45deg)) !important;
+    animation-delay: 0.125s;
+}
+
+.dots-container.processing .dot:nth-child(8n+3) {
+    left: calc(50% + 90px * cos(90deg)) !important;
+    top: calc(50% + 90px * sin(90deg)) !important;
+    animation-delay: 0.25s;
+}
+
+.dots-container.processing .dot:nth-child(8n+4) {
+    left: calc(50% + 90px * cos(135deg)) !important;
+    top: calc(50% + 90px * sin(135deg)) !important;
+    animation-delay: 0.375s;
+}
+
+.dots-container.processing .dot:nth-child(8n+5) {
+    left: calc(50% + 90px * cos(180deg)) !important;
+    top: calc(50% + 90px * sin(180deg)) !important;
+    animation-delay: 0.5s;
+}
+
+.dots-container.processing .dot:nth-child(8n+6) {
+    left: calc(50% + 90px * cos(225deg)) !important;
+    top: calc(50% + 90px * sin(225deg)) !important;
+    animation-delay: 0.625s;
+}
+
+.dots-container.processing .dot:nth-child(8n+7) {
+    left: calc(50% + 90px * cos(270deg)) !important;
+    top: calc(50% + 90px * sin(270deg)) !important;
+    animation-delay: 0.75s;
+}
+
+.dots-container.processing .dot:nth-child(8n+8) {
+    left: calc(50% + 90px * cos(315deg)) !important;
+    top: calc(50% + 90px * sin(315deg)) !important;
+    animation-delay: 0.875s;
+}
+
+/* === 4단계: TTS 발화 - 10개 그룹으로 부드러운 파도 === */
+.dots-container.tts-playing .dot {
+    background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    opacity: 0.85;
+    top: 50% !important;
+}
+
+/* 10개 그룹으로 가로 배치 */
+.dots-container.tts-playing .dot:nth-child(10n+1),
+.dots-container.tts-playing .dot:nth-child(10n+2),
+.dots-container.tts-playing .dot:nth-child(10n+3),
+.dots-container.tts-playing .dot:nth-child(10n+4) {
+    left: 10% !important;
+    animation: smooth-wave 2.5s ease-in-out infinite;
+    animation-delay: 0s;
+}
+
+.dots-container.tts-playing .dot:nth-child(10n+5),
+.dots-container.tts-playing .dot:nth-child(10n+6),
+.dots-container.tts-playing .dot:nth-child(10n+7) {
+    left: 22% !important;
+    animation: smooth-wave 2.5s ease-in-out infinite;
+    animation-delay: 0.15s;
+}
+
+.dots-container.tts-playing .dot:nth-child(10n+8),
+.dots-container.tts-playing .dot:nth-child(10n+9),
+.dots-container.tts-playing .dot:nth-child(10n+10) {
+    left: 34% !important;
+    animation: smooth-wave 2.5s ease-in-out infinite;
+    animation-delay: 0.3s;
+}
+
+.dots-container.tts-playing .dot:nth-child(20n+11),
+.dots-container.tts-playing .dot:nth-child(20n+12),
+.dots-container.tts-playing .dot:nth-child(20n+13),
+.dots-container.tts-playing .dot:nth-child(20n+14) {
+    left: 46% !important;
+    animation: smooth-wave 2.5s ease-in-out infinite;
+    animation-delay: 0.45s;
+}
+
+.dots-container.tts-playing .dot:nth-child(20n+15),
+.dots-container.tts-playing .dot:nth-child(20n+16),
+.dots-container.tts-playing .dot:nth-child(20n+17) {
+    left: 58% !important;
+    animation: smooth-wave 2.5s ease-in-out infinite;
+    animation-delay: 0.6s;
+}
+
+.dots-container.tts-playing .dot:nth-child(20n+18),
+.dots-container.tts-playing .dot:nth-child(20n+19),
+.dots-container.tts-playing .dot:nth-child(20n+20) {
+    left: 70% !important;
+    animation: smooth-wave 2.5s ease-in-out infinite;
+    animation-delay: 0.75s;
+}
+
+.dots-container.tts-playing .dot:nth-child(30n+21),
+.dots-container.tts-playing .dot:nth-child(30n+22),
+.dots-container.tts-playing .dot:nth-child(30n+23),
+.dots-container.tts-playing .dot:nth-child(30n+24) {
+    left: 82% !important;
+    animation: smooth-wave 2.5s ease-in-out infinite;
+    animation-delay: 0.9s;
+}
+
+.dots-container.tts-playing .dot:nth-child(30n+25),
+.dots-container.tts-playing .dot:nth-child(30n+26),
+.dots-container.tts-playing .dot:nth-child(30n+27) {
+    left: 94% !important;
+    animation: smooth-wave 2.5s ease-in-out infinite;
+    animation-delay: 1.05s;
+}
+
+/* .dots-container.tts-playing .dot:nth-child(30n+28),
+.dots-container.tts-playing .dot:nth-child(30n+29),
+.dots-container.tts-playing .dot:nth-child(30n+30) {
+    left: 106% !important;
+    animation: smooth-wave 2.5s ease-in-out infinite;
+    animation-delay: 1.2s;
+} */ 

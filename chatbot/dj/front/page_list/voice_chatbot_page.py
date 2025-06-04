@@ -41,13 +41,50 @@ def voice_chatbot_page():
     if "js_messages" not in st.session_state:
         st.session_state.js_messages = []
 
-    css_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "assets/css",
-        "voice_chatbot.css",
-    )
-    with open(css_path, "r") as f:
-        css_content = f.read()
+    # CSS 파일들 로드
+    css_files = [
+        "base.css",
+        "animations.css", 
+        "dots.css",
+        "button.css",
+        "effects.css"
+    ]
+    
+    css_content = ""
+    css_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets/css")
+    
+    for css_file in css_files:
+        css_path = os.path.join(css_dir, css_file)
+        try:
+            with open(css_path, "r", encoding="utf-8") as f:
+                css_content += f"/* === {css_file} === */\n"
+                css_content += f.read()
+                css_content += "\n\n"
+        except FileNotFoundError:
+            logger.warning(f"CSS 파일을 찾을 수 없습니다: {css_path}")
+
+    # JS 파일들 로드 (config.js를 첫 번째로)
+    js_files = [
+        "config.js",
+        "audio-manager.js",
+        "dots-manager.js", 
+        "api-client.js",
+        "ui-controller.js",
+        "voice-chatbot.js"
+    ]
+    
+    js_content = ""
+    js_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "assets/js")
+    
+    for js_file in js_files:
+        js_path = os.path.join(js_dir, js_file)
+        try:
+            with open(js_path, "r", encoding="utf-8") as f:
+                js_content += f"/* === {js_file} === */\n"
+                js_content += f.read()
+                js_content += "\n\n"
+        except FileNotFoundError:
+            logger.warning(f"JS 파일을 찾을 수 없습니다: {js_path}")
 
     processing_css = """
     /* 처리 중 상태 스타일 */
@@ -62,17 +99,7 @@ def voice_chatbot_page():
     }
     """
 
-    js_path = os.path.join(
-        os.path.dirname(os.path.dirname(__file__)),
-        "assets/js",
-        "voice_chatbot.js",
-    )
-    with open(js_path, "r") as f:
-        js_content = f.read()
-
-    logger.debug(
-        f"CSS 및 JS 파일을 성공적으로 로드했습니다. CSS: {css_path}, JS: {js_path}"
-    )
+    logger.debug(f"CSS 및 JS 파일을 성공적으로 로드했습니다.")
 
     voice_interface_html = f"""
     <html>

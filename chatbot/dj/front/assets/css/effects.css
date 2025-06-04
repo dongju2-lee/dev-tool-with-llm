@@ -1,0 +1,80 @@
+/* === 부드러운 상태 전환 === */
+.dots-container.idle-to-speaking .dot {
+    transition: all 2s cubic-bezier(0.23, 1, 0.32, 1);
+    animation: morph-to-listening 2s ease-out forwards;
+}
+
+@keyframes morph-to-listening {
+    0% {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    }
+    100% {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    }
+}
+
+.dots-container.speaking-to-processing .dot {
+    transition: all 2.5s cubic-bezier(0.23, 1, 0.32, 1);
+    animation: morph-to-spinner 2.5s ease-out forwards;
+}
+
+@keyframes morph-to-spinner {
+    0% {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    }
+    50% {
+        background: linear-gradient(135deg, #93c5fd, #60a5fa);
+        transform: scale(0.8);
+    }
+    100% {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+        transform: scale(1);
+    }
+}
+
+.dots-container.processing-to-tts-playing .dot {
+    transition: all 2s cubic-bezier(0.23, 1, 0.32, 1);
+    animation: morph-to-wave 2s ease-out forwards;
+}
+
+@keyframes morph-to-wave {
+    0% {
+        background: linear-gradient(135deg, #ef4444, #dc2626);
+    }
+    100% {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    }
+}
+
+.dots-container.tts-playing-to-idle .dot {
+    transition: all 3s cubic-bezier(0.23, 1, 0.32, 1);
+    animation: morph-to-circle 3s ease-out forwards;
+}
+
+@keyframes morph-to-circle {
+    0% {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    }
+    50% {
+        background: linear-gradient(135deg, #93c5fd, #60a5fa);
+        transform: scale(0.6);
+    }
+    100% {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+        transform: scale(1);
+    }
+}
+
+.dots-container.speaking-to-idle .dot {
+    transition: all 2.5s cubic-bezier(0.23, 1, 0.32, 1);
+    animation: morph-listening-to-circle 2.5s ease-out forwards;
+}
+
+@keyframes morph-listening-to-circle {
+    0% {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    }
+    100% {
+        background: linear-gradient(135deg, #60a5fa, #3b82f6);
+    }
+} 

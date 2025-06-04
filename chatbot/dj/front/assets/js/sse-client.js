@@ -7,14 +7,14 @@ class SSEClient {
         this.isConnected = false;
         this.reconnectAttempts = 0;
         this.maxReconnectAttempts = 5;
-        this.reconnectDelay = 1000; // 1초
-        this.listeners = new Map();
+        this.reconnectDelay = 2000; // 2초
+        this.eventListeners = {};
         
-        console.log(`SSE 클라이언트 초기화: ${this.clientId}`);
+        console.log(`SSE 클라이언트 생성됨 - Client ID: ${this.clientId}`);
     }
     
     generateClientId() {
-        return `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        return 'client_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
     }
     
     connect() {
@@ -39,10 +39,10 @@ class SSEClient {
             this.eventSource.onmessage = (event) => {
                 try {
                     const data = JSON.parse(event.data);
-                    console.log('SSE 메시지 수신:', data);
+                    console.log('SSE 알림 수신:', data);
                     this.handleMessage(data);
                 } catch (error) {
-                    console.error('SSE 메시지 파싱 오류:', error);
+                    console.error('SSE 알림 파싱 오류:', error);
                 }
             };
             
@@ -74,12 +74,12 @@ class SSEClient {
     
     disconnect() {
         if (this.eventSource) {
-            console.log('SSE 연결 해제');
             this.eventSource.close();
             this.eventSource = null;
         }
         this.isConnected = false;
         this.emit('disconnected');
+        console.log('SSE 연결 해제됨');
     }
     
     handleMessage(data) {
@@ -89,10 +89,13 @@ class SSEClient {
         this.emit(type, data);
         this.emit('message', data);
         
-        // 특별한 메시지 타입 처리
+        // 알림 저장 (연결 알림과 하트비트 제외)
+        addStoredNotification(data);
+        
+        // 특별한 알림 타입 처리
         switch (type) {
             case 'connection':
-                console.log('연결 확인 메시지:', data.message);
+                console.log('연결 확인 알림:', data.message);
                 break;
             case 'heartbeat':
                 // heartbeat는 로그 출력하지 않음 (연결 유지용)
@@ -107,12 +110,12 @@ class SSEClient {
                 this.handleNotification(data);
                 break;
             default:
-                console.log('알 수 없는 메시지 타입:', type, data);
+                console.log('알 수 없는 알림 타입:', type, data);
         }
     }
     
     handleVoiceStatus(data) {
-        console.log(`음성 상태 업데이트: ${data.status} - ${data.message}`);
+        console.log(`음성 상태 변경: ${data.message}`);
         this.emit('voiceStatusChanged', data);
     }
     
@@ -123,75 +126,72 @@ class SSEClient {
     
     showNotification(data) {
         // 브라우저 알림 표시
-        if ('Notification' in window && Notification.permission === 'granted') {
-            new Notification(data.title, {
+        if (Notification.permission === 'granted') {
+            const notification = new Notification(data.title || '알림', {
                 body: data.message,
-                icon: this.getNotificationIcon(data.type),
+                icon: '/favicon.ico',
                 tag: data.type
             });
+            
+            setTimeout(() => {
+                notification.close();
+            }, 5000);
         }
         
-        // 커스텀 알림 UI 표시
-        this.showCustomNotification(data);
+        // 페이지 내 알림 표시
+        this.showPageNotification(data);
     }
     
-    showCustomNotification(data) {
-        // 알림 컨테이너 생성 또는 가져오기
-        let container = document.getElementById('sse-notifications');
-        if (!container) {
-            container = document.createElement('div');
-            container.id = 'sse-notifications';
-            container.className = 'sse-notifications-container';
-            document.body.appendChild(container);
-        }
+    showPageNotification(data) {
+        const container = this.getNotificationContainer();
+        const notification = this.createNotificationElement(data);
         
-        // 알림 요소 생성
-        const notification = document.createElement('div');
-        notification.className = `sse-notification sse-notification-${data.type}`;
-        notification.innerHTML = `
-            <div class="sse-notification-header">
-                <span class="sse-notification-icon">${this.getNotificationEmoji(data.type)}</span>
-                <span class="sse-notification-title">${data.title}</span>
-                <button class="sse-notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
-            </div>
-            <div class="sse-notification-message">${data.message}</div>
-            ${data.timestamp ? `<div class="sse-notification-time">${new Date(data.timestamp).toLocaleTimeString()}</div>` : ''}
-        `;
-        
-        // 알림 추가
         container.appendChild(notification);
         
-        // 애니메이션 효과
+        // 애니메이션을 위한 지연
         setTimeout(() => {
             notification.classList.add('sse-notification-show');
         }, 100);
         
-        // 자동 제거 (오류는 수동으로만 제거)
-        if (data.type !== 'error') {
-            setTimeout(() => {
-                notification.classList.remove('sse-notification-show');
-                setTimeout(() => {
-                    if (notification.parentNode) {
-                        notification.remove();
-                    }
-                }, 300);
-            }, 5000);
+        // 자동 제거
+        setTimeout(() => {
+            this.removeNotification(notification);
+        }, 5000);
+    }
+    
+    getNotificationContainer() {
+        let container = document.getElementById('sse-notifications-container');
+        if (!container) {
+            container = document.createElement('div');
+            container.id = 'sse-notifications-container';
+            container.className = 'sse-notifications-container';
+            document.body.appendChild(container);
         }
+        return container;
+    }
+    
+    createNotificationElement(data) {
+        const notification = document.createElement('div');
+        notification.className = `sse-notification sse-notification-${data.type}`;
+        
+        const icon = this.getNotificationIcon(data.type);
+        const time = new Date().toLocaleTimeString();
+        
+        notification.innerHTML = `
+            <div class="sse-notification-header">
+                <span class="sse-notification-icon">${icon}</span>
+                <span class="sse-notification-title">${data.title || '알림'}</span>
+                <button class="sse-notification-close" onclick="this.parentElement.parentElement.remove()">×</button>
+            </div>
+            <div class="sse-notification-message">${data.message}</div>
+            <div class="sse-notification-time">${time}</div>
+        `;
+        
+        return notification;
     }
     
     getNotificationIcon(type) {
         const icons = {
-            info: '/static/icons/info.png',
-            success: '/static/icons/success.png',
-            warning: '/static/icons/warning.png',
-            error: '/static/icons/error.png',
-            voice_status: '/static/icons/voice.png'
-        };
-        return icons[type] || icons.info;
-    }
-    
-    getNotificationEmoji(type) {
-        const emojis = {
             info: 'ℹ️',
             success: '✅',
             warning: '⚠️',
@@ -199,62 +199,271 @@ class SSEClient {
             voice_status: '🎤',
             connection: '🔗'
         };
-        return emojis[type] || 'ℹ️';
+        return icons[type] || 'ℹ️';
+    }
+    
+    removeNotification(notification) {
+        notification.classList.remove('sse-notification-show');
+        notification.classList.add('sse-notification-exit');
+        
+        setTimeout(() => {
+            if (notification.parentNode) {
+                notification.parentNode.removeChild(notification);
+            }
+        }, 300);
+    }
+    
+    requestNotificationPermission() {
+        if ('Notification' in window && Notification.permission === 'default') {
+            Notification.requestPermission().then(permission => {
+                console.log('알림 권한:', permission);
+            });
+        }
     }
     
     // 이벤트 리스너 관리
     on(event, callback) {
-        if (!this.listeners.has(event)) {
-            this.listeners.set(event, []);
+        if (!this.eventListeners[event]) {
+            this.eventListeners[event] = [];
         }
-        this.listeners.get(event).push(callback);
+        this.eventListeners[event].push(callback);
     }
     
     off(event, callback) {
-        if (this.listeners.has(event)) {
-            const callbacks = this.listeners.get(event);
-            const index = callbacks.indexOf(callback);
-            if (index > -1) {
-                callbacks.splice(index, 1);
-            }
+        if (this.eventListeners[event]) {
+            this.eventListeners[event] = this.eventListeners[event].filter(cb => cb !== callback);
         }
     }
     
     emit(event, data) {
-        if (this.listeners.has(event)) {
-            this.listeners.get(event).forEach(callback => {
+        if (this.eventListeners[event]) {
+            this.eventListeners[event].forEach(callback => {
                 try {
                     callback(data);
                 } catch (error) {
-                    console.error(`이벤트 리스너 오류 (${event}):`, error);
+                    console.error(`이벤트 리스너 오류 [${event}]:`, error);
                 }
             });
         }
     }
     
-    // 브라우저 알림 권한 요청
-    async requestNotificationPermission() {
-        if ('Notification' in window) {
-            const permission = await Notification.requestPermission();
-            console.log('알림 권한:', permission);
-            return permission === 'granted';
+    // 서버에 알림 전송
+    async sendNotification(type, title, message, targetClientId = null) {
+        try {
+            const payload = {
+                type,
+                title,
+                message,
+                target_client_id: targetClientId,
+                sender_client_id: this.clientId
+            };
+            
+            const response = await fetch(`${this.serverUrl}/send-notification`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(payload)
+            });
+            
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const result = await response.json();
+            console.log('알림 전송 성공:', result);
+            return result;
+            
+        } catch (error) {
+            console.error('알림 전송 실패:', error);
+            throw error;
         }
-        return false;
-    }
-    
-    // 연결 상태 확인
-    getConnectionStatus() {
-        return {
-            isConnected: this.isConnected,
-            clientId: this.clientId,
-            reconnectAttempts: this.reconnectAttempts,
-            readyState: this.eventSource ? this.eventSource.readyState : null
-        };
     }
 }
 
 // 글로벌 SSE 클라이언트 인스턴스
 let sseClient = null;
+
+// 알림 저장소
+let storedNotifications = [];
+let isNotificationsVisible = false;
+
+// 알림 저장 함수
+function addStoredNotification(data) {
+    // 연결 알림과 하트비트는 저장하지 않음
+    if (data.type === 'connection' || data.type === 'heartbeat') {
+        return;
+    }
+    
+    const notification = {
+        id: Date.now() + Math.random(),
+        type: data.type,
+        title: data.title,
+        message: data.message,
+        timestamp: data.timestamp || new Date().toISOString(),
+        data: data.data
+    };
+    
+    storedNotifications.unshift(notification); // 최신 알림을 앞에 추가
+    
+    // 최대 50개 알림만 저장
+    if (storedNotifications.length > 50) {
+        storedNotifications = storedNotifications.slice(0, 50);
+    }
+    
+    updateBellStatus();
+    console.log('알림 저장됨:', notification);
+}
+
+// 알림 확인 처리
+function confirmNotification(notificationId) {
+    console.log('알림 확인 시작:', notificationId);
+    console.log('삭제 전 알림 개수:', storedNotifications.length);
+    
+    // 알림 요소 찾기
+    const notificationElements = document.querySelectorAll('.sse-notification-item');
+    let targetElement = null;
+    
+    notificationElements.forEach(element => {
+        const confirmButton = element.querySelector('.sse-notification-confirm');
+        if (confirmButton && confirmButton.getAttribute('onclick').includes(notificationId)) {
+            targetElement = element;
+        }
+    });
+    
+    // 저장된 알림에서 즉시 제거
+    const originalLength = storedNotifications.length;
+    storedNotifications = storedNotifications.filter(notification => notification.id != notificationId); // == 대신 != 사용
+    console.log('삭제 후 알림 개수:', storedNotifications.length);
+    
+    if (originalLength === storedNotifications.length) {
+        console.warn('알림이 삭제되지 않았습니다. ID 확인:', notificationId);
+        // ID 타입 변환 시도
+        storedNotifications = storedNotifications.filter(notification => String(notification.id) !== String(notificationId));
+        console.log('타입 변환 후 삭제 시도, 알림 개수:', storedNotifications.length);
+    }
+    
+    // 벨 상태 즉시 업데이트
+    updateBellStatus();
+    
+    if (targetElement) {
+        // 삭제 애니메이션 시작
+        targetElement.classList.add('removing');
+        
+        // 애니메이션 완료 후 화면 업데이트
+        setTimeout(() => {
+            updateNotificationsDisplay();
+            console.log('알림 확인 완료:', notificationId);
+        }, 300);
+    } else {
+        // 요소를 찾지 못한 경우 바로 화면 업데이트
+        updateNotificationsDisplay();
+        console.log('알림 확인 완료 (요소 없음):', notificationId);
+    }
+}
+
+// 벨 상태 업데이트
+function updateBellStatus() {
+    const hasNotifications = storedNotifications.length > 0;
+    const statusElement = document.getElementById('sse-status');
+    
+    if (statusElement) {
+        if (hasNotifications) {
+            statusElement.className = 'sse-status sse-status-has-notifications';
+            statusElement.title = `새 알림 ${storedNotifications.length}개`;
+        } else {
+            statusElement.className = 'sse-status sse-status-connected';
+            statusElement.title = 'SSE 연결됨';
+        }
+    }
+}
+
+// 알림 목록 토글
+function toggleNotifications() {
+    isNotificationsVisible = !isNotificationsVisible;
+    
+    let container = document.getElementById('sse-notifications-container-list');
+    
+    if (isNotificationsVisible) {
+        if (!container) {
+            container = createNotificationsContainer();
+        }
+        container.classList.add('show');
+        updateNotificationsDisplay();
+    } else {
+        if (container) {
+            container.classList.remove('show');
+        }
+    }
+}
+
+// 알림 컨테이너 생성
+function createNotificationsContainer() {
+    const container = document.createElement('div');
+    container.id = 'sse-notifications-container-list';
+    container.className = 'sse-notifications-container-list';
+    
+    container.innerHTML = `
+        <div class="sse-notifications-header">
+            받은 알림
+        </div>
+        <div class="sse-notifications-list" id="sse-notifications-list">
+            <!-- 알림들이 여기에 표시됩니다 -->
+        </div>
+    `;
+    
+    document.body.appendChild(container);
+    return container;
+}
+
+// 알림 목록 업데이트
+function updateNotificationsDisplay() {
+    const listElement = document.getElementById('sse-notifications-list');
+    if (!listElement) return;
+    
+    if (storedNotifications.length === 0) {
+        listElement.innerHTML = `
+            <div class="sse-notifications-empty">
+                새로운 알림이 없습니다
+            </div>
+        `;
+        return;
+    }
+    
+    listElement.innerHTML = storedNotifications.map(notification => `
+        <div class="sse-notification-item ${notification.type}">
+            <div class="sse-notification-header-item">
+                <div class="sse-notification-title-item">${notification.title}</div>
+                <div class="sse-notification-time">${formatTime(notification.timestamp)}</div>
+            </div>
+            <div class="sse-notification-content">${notification.message}</div>
+            <div class="sse-notification-actions">
+                <button class="sse-notification-confirm" onclick="confirmNotification('${notification.id}')">
+                    확인
+                </button>
+            </div>
+        </div>
+    `).join('');
+}
+
+// 시간 포맷팅 함수
+function formatTime(timestamp) {
+    const now = new Date();
+    const time = new Date(timestamp);
+    const diffMs = now - time;
+    const diffMins = Math.floor(diffMs / (1000 * 60));
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    
+    if (diffMins < 1) {
+        return '방금 전';
+    } else if (diffMins < 60) {
+        return `${diffMins}분 전`;
+    } else if (diffHours < 24) {
+        return `${diffHours}시간 전`;
+    } else {
+        return time.toLocaleDateString();
+    }
+}
 
 // SSE 클라이언트 초기화 함수
 function initSSEClient() {
@@ -304,89 +513,67 @@ function initSSEClient() {
 
 // SSE 상태 표시 함수
 function showSSEStatus(status, message) {
-    // 상태 표시 UI 업데이트
-    const statusElement = document.getElementById('sse-status');
-    if (statusElement) {
-        // 이전 애니메이션 클래스 제거
-        statusElement.classList.remove('sse-status-just-connected');
+    let statusElement = document.getElementById('sse-status');
+    
+    if (!statusElement) {
+        statusElement = document.createElement('div');
+        statusElement.id = 'sse-status';
+        statusElement.className = 'sse-status';
         
         // SVG 벨 아이콘
-        const bellIcon = `
-            <svg viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 2C13.1 2 14 2.9 14 4C14 5.1 13.1 6 12 6C10.9 6 10 5.1 10 4C10 2.9 10.9 2 12 2ZM21 19V20H3V19L5 17V11C5 7.9 7 5.2 10 4.3V4C10 2.9 10.9 2 12 2S14 2.9 14 4V4.3C17 5.2 19 7.9 19 11V17L21 19ZM12 22C10.9 22 10 21.1 10 20H14C14 21.1 13.1 22 12 22Z"/>
-            </svg>
+        statusElement.innerHTML = `
+            <div class="sse-status-icon">
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 22c1.1 0 2-.9 2-2h-4c0 1.1.89 2 2 2zm6-6v-5c0-3.07-1.64-5.64-4.5-6.32V4c0-.83-.67-1.5-1.5-1.5s-1.5.67-1.5 1.5v.68C7.63 5.36 6 7.92 6 11v5l-2 2v1h16v-1l-2-2z"/>
+                </svg>
+            </div>
         `;
         
-        // 상태 업데이트 (텍스트 없이 아이콘만)
-        statusElement.className = `sse-status sse-status-${status}`;
-        statusElement.innerHTML = `<div class="sse-status-icon">${bellIcon}</div>`;
-        statusElement.title = message; // 툴팁으로 상태 메시지 표시
-        
-        // 연결 성공 시 반짝임 효과
-        if (status === 'connected') {
-            setTimeout(() => {
-                statusElement.classList.add('sse-status-just-connected');
-            }, 100);
-            
-            // 애니메이션 완료 후 클래스 제거
-            setTimeout(() => {
-                statusElement.classList.remove('sse-status-just-connected');
-            }, 900);
-        }
+        document.body.appendChild(statusElement);
     }
     
-    // 음성 챗봇 페이지에 상태 알림
-    if (typeof notifyStreamlit === 'function') {
-        notifyStreamlit({
-            type: 'sse_status',
-            status: status,
-            message: message
-        });
+    // onclick 이벤트 항상 설정 (함수명 변경 대응)
+    statusElement.onclick = toggleNotifications;
+    
+    // 상태에 따른 클래스 설정
+    statusElement.className = `sse-status sse-status-${status}`;
+    statusElement.title = message;
+    
+    // 연결 성공 시 반짝임 효과
+    if (status === 'connected') {
+        statusElement.classList.add('sse-status-just-connected');
+        setTimeout(() => {
+            statusElement.classList.remove('sse-status-just-connected');
+        }, 800);
     }
+    
+    // 알림이 있는지 확인하여 상태 업데이트
+    updateBellStatus();
 }
 
 // 음성 상태 UI 업데이트 함수
 function updateVoiceStatusUI(data) {
-    // 음성 상태에 따른 UI 업데이트
-    const { status, message } = data;
-    
-    // 점들 상태 업데이트
-    switch (status) {
-        case 'idle':
-            if (typeof setDotsIdle === 'function') setDotsIdle();
-            break;
-        case 'recording':
-            // 녹음 중 상태는 로컬에서 관리
-            break;
-        case 'processing':
-            if (typeof setDotsProcessing === 'function') setDotsProcessing();
-            break;
-        case 'speaking':
-            if (typeof setDotsTTSPlaying === 'function') setDotsTTSPlaying();
-            break;
-    }
-    
-    // 상태 메시지 표시
-    if (message) {
-        console.log(`음성 상태: ${status} - ${message}`);
-    }
+    // 음성 상태에 따른 UI 업데이트 로직
+    console.log('음성 상태 UI 업데이트:', data);
 }
 
-// SSE 클라이언트 연결 함수
-function connectSSE() {
+// 외부 클릭 시 알림 목록 닫기
+document.addEventListener('click', (event) => {
+    const notificationsContainer = document.getElementById('sse-notifications-container-list');
+    const statusElement = document.getElementById('sse-status');
+    
+    if (isNotificationsVisible && notificationsContainer && statusElement) {
+        // 벨 아이콘이나 알림 컨테이너 내부를 클릭한 경우가 아니라면 닫기
+        if (!statusElement.contains(event.target) && !notificationsContainer.contains(event.target)) {
+            isNotificationsVisible = false;
+            notificationsContainer.classList.remove('show');
+        }
+    }
+});
+
+// 페이지 로드 시 자동 초기화
+document.addEventListener('DOMContentLoaded', () => {
+    console.log('SSE 클라이언트 자동 초기화 시작');
     const client = initSSEClient();
     client.connect();
-    return client;
-}
-
-// SSE 클라이언트 연결 해제 함수
-function disconnectSSE() {
-    if (sseClient) {
-        sseClient.disconnect();
-    }
-}
-
-// 페이지 언로드 시 연결 해제
-window.addEventListener('beforeunload', () => {
-    disconnectSSE();
 }); 

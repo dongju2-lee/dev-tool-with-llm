@@ -1,81 +1,46 @@
-# 슬라임 챗봇 프론트엔드
+# Getting Started with Create React App
 
-이 프로젝트는 Streamlit을 사용하여 구현된 챗봇 프론트엔드입니다. 백엔드 API와 통신하여 채팅 기능을 제공합니다.
+This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
-## 기능
+## Available Scripts
 
-- 텍스트 및 이미지 메시지 지원
-- 스트리밍 응답 처리
-- 대화 세션 관리
-- MCP 서버 연결 설정 관리
-- 다양한 모델 선택 지원
+In the project directory, you can run:
 
-## 실행 방법
+### `npm start`
 
-### 가상 환경 설정
+Runs the app in the development mode.\
+Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 
-#### Python venv 사용
+The page will reload if you make edits.\
+You will also see any lint errors in the console.
 
-```bash
-# 가상 환경 생성
-python -m venv venv
+### `npm test`
 
-# 가상 환경 활성화 (Windows)
-venv\Scripts\activate
+Launches the test runner in the interactive watch mode.\
+See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-# 가상 환경 활성화 (macOS/Linux)
-source venv/bin/activate
+### `npm run build`
 
-# 의존성 설치
-pip install -r requirements.txt
-```
-### 로컬 개발 환경에서 실행
+Builds the app for production to the `build` folder.\
+It correctly bundles React in production mode and optimizes the build for the best performance.
 
-1. 가상 환경 활성화 (위의 단계에서 이미 완료)
+The build is minified and the filenames include the hashes.\
+Your app is ready to be deployed!
 
-2. 환경 변수 설정 (선택 사항)
-```bash
-# Windows
-set API_BASE_URL=http://localhost:8000/api
+See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-# macOS/Linux
-export API_BASE_URL=http://localhost:8000/api
-```
+### `npm run eject`
 
-3. 애플리케이션 실행
-```bash
-streamlit run app.py
-```
+**Note: this is a one-way operation. Once you `eject`, you can’t go back!**
 
-### Docker로 실행
+If you aren’t satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
 
-1. Docker 이미지 빌드
-```bash
-docker build -t chatbot-frontend .
-```
+Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you’re on your own.
 
-2. Docker 컨테이너 실행
-```bash
-docker run -p 8501:8501 -e API_BASE_URL=http://localhost:8000/api chatbot-frontend
-```
+You don’t have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn’t feel obligated to use this feature. However we understand that this tool wouldn’t be useful if you couldn’t customize it when you are ready for it.
 
-## 환경 변수
+## Learn More
 
-- `API_BASE_URL`: 백엔드 API 서버 URL (기본값: http://localhost:8000/api)
+You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
 
-## 백엔드 요구사항
-
-이 프론트엔드가 제대로 작동하려면 다음 API 엔드포인트를 제공하는 백엔드 서버가 필요합니다:
-
-- `POST /api/chat/sessions`: 새 채팅 세션 생성
-- `POST /api/chat/sessions/{session_id}/messages`: 메시지 전송
-- `GET /api/chat/sessions/{session_id}/messages`: 대화 이력 조회
-- `DELETE /api/chat/sessions/{session_id}`: 세션 삭제
-- `POST /api/mcp/connection/test`: MCP 서버 연결 테스트
-- `POST /api/mcp/settings`: MCP 서버 설정 저장
-- `GET /api/mcp/settings`: MCP 서버 설정 조회
-- `GET /api/models`: 사용 가능한 모델 목록 조회
-
-## 개발 참고사항
-
-백엔드 API가 아직 개발 중일 경우, 프론트엔드는 오프라인 모드로 작동할 수 있지만 실제 채팅 응답은 제공하지 않습니다. 이 경우 백엔드 API 개발에 참조할 수 있는 API 인터페이스는 `../api_design.md`에서 확인할 수 있습니다. 
+To learn React, check out the [React documentation](https://reactjs.org/).

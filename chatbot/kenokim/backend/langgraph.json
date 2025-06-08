@@ -1,0 +1,10 @@
+{
+  "graphs": {
+    "agent": "app.graph.instance:get_app_graph"
+  },
+  "dependencies": [
+    "requirements.txt"
+  ],
+  "dockerfile": "Dockerfile",
+  "env": ".env"
+}

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect, FormEvent, ChangeEvent } from 'react';
-import langserveClient from '../services/langserveClient';
+import apiClient from '../services/langserveClient';
 import { ChatMessage } from '../types';
 import './ChatInterface.css';
 
@@ -18,6 +18,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [isStreaming, setIsStreaming] = useState<boolean>(false);
   const [isConnected, setIsConnected] = useState<boolean>(true);
+  const [threadId, setThreadId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = (): void => {
@@ -30,11 +31,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   useEffect(() => {
     checkConnection();
-  }, []);
+    // 스레드 ID 초기화 또는 채팅 ID 사용
+    if (chatId && !threadId) {
+      setThreadId(chatId);
+    }
+  }, [chatId]);
 
   const checkConnection = async (): Promise<void> => {
     try {
-      const connected = await langserveClient.testConnection();
+      const connected = await apiClient.testConnection();
       setIsConnected(connected);
     } catch {
       setIsConnected(false);
@@ -59,22 +64,33 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setIsLoading(true);
 
     try {
-      const response = await langserveClient.invoke({
-        messages: [{ role: 'human', content: currentInput }]
-      });
+      const response = await apiClient.sendMessage(currentInput, threadId || undefined);
 
-      if (response.messages && response.messages.length > 0) {
-        const lastMessage = response.messages[response.messages.length - 1];
-        const aiMessage: ChatMessage = { 
-          role: 'assistant', 
-          content: lastMessage.content,
-          timestamp: new Date()
-        };
-        onMessagesUpdate([...newMessages, aiMessage]);
+      const aiMessage: ChatMessage = { 
+        role: 'assistant', 
+        content: response.content,
+        timestamp: new Date()
+      };
+      onMessagesUpdate([...newMessages, aiMessage]);
+
+      // 메타데이터가 있으면 로그에 출력
+      if (response.metadata) {
+        console.log('Agent metadata:', {
+          agent_used: response.metadata.agent_used,
+          tools_used: response.metadata.tools_used,
+          supervisor_reasoning: response.metadata.supervisor_reasoning
+        });
       }
+
     } catch (error: any) {
-      console.error('Error:', error);
-      const errorMessage = '죄송합니다. 오류가 발생했습니다.';
+      console.error('API Error:', error);
+      let errorMessage = '죄송합니다. 오류가 발생했습니다.';
+      
+      if (error.message.includes('HTTP 404')) {
+        errorMessage = '서버에 연결할 수 없습니다. 백엔드 서버가 실행 중인지 확인해주세요.';
+      } else if (error.message.includes('HTTP 500')) {
+        errorMessage = '서버 내부 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+      }
       
       onMessagesUpdate([...newMessages, { 
         role: 'assistant', 
@@ -114,43 +130,41 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
     try {
       let fullContent = '';
-      const stream = langserveClient.stream({
-        messages: [{ role: 'human', content: currentInput }]
-      });
+      const stream = apiClient.streamMessage(currentInput, threadId || undefined);
 
       for await (const chunk of stream) {
-        if (chunk.agent && chunk.agent.messages) {
-          const lastMessage = chunk.agent.messages[chunk.agent.messages.length - 1];
-          if (lastMessage.content) {
-            fullContent = lastMessage.content;
-                         const updatedMessages = [...newMessages, { 
-                role: 'assistant' as const, 
-                content: fullContent,
-                isStreaming: true,
-                timestamp: new Date()
-             }];
-            onMessagesUpdate(updatedMessages);
-          }
-        }
+        fullContent += chunk;
+        const updatedMessages = [...newMessages, { 
+          role: 'assistant' as const, 
+          content: fullContent,
+          isStreaming: true,
+          timestamp: new Date()
+        }];
+        onMessagesUpdate(updatedMessages);
       }
 
       // 스트리밍 완료 표시
-             const finalMessages = [...newMessages, { 
-          role: 'assistant' as const, 
-          content: fullContent,
-          isStreaming: false,
-          timestamp: new Date()
-       }];
+      const finalMessages = [...newMessages, { 
+        role: 'assistant' as const, 
+        content: fullContent,
+        isStreaming: false,
+        timestamp: new Date()
+      }];
       onMessagesUpdate(finalMessages);
+
     } catch (error: any) {
       console.error('Streaming error:', error);
-      const errorMessage = '스트리밍 중 오류가 발생했습니다.';
+      let errorMessage = '스트리밍 중 오류가 발생했습니다.';
       
-             const errorMessages = [...newMessages, { 
-          role: 'assistant' as const, 
-          content: errorMessage,
-          timestamp: new Date()
-       }];
+      if (error.message.includes('HTTP 404')) {
+        errorMessage = '스트리밍 엔드포인트를 찾을 수 없습니다. 백엔드 서버 설정을 확인해주세요.';
+      }
+      
+      const errorMessages = [...newMessages, { 
+        role: 'assistant' as const, 
+        content: errorMessage,
+        timestamp: new Date()
+      }];
       onMessagesUpdate(errorMessages);
     } finally {
       setIsStreaming(false);
@@ -164,23 +178,42 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const clearChat = (): void => {
     const welcomeMessage: ChatMessage = {
       role: 'assistant',
-      content: '안녕하세요! LangGraph Agent에 오신 것을 환영합니다. Grafana 모니터링 시스템을 도와드릴 수 있습니다. 무엇을 도와드릴까요?',
+      content: '안녕하세요! Grafana 모니터링 전문 AI 어시스턴트입니다. 다음과 같은 업무를 도와드릴 수 있습니다:\n\n📊 Grafana 대시보드 데이터 조회 및 분석\n📈 시스템 메트릭 및 성능 분석\n🖼️ 대시보드 시각화 및 차트 생성\n⚙️ 알람 설정 및 모니터링 관리\n\n무엇을 도와드릴까요?',
       timestamp: new Date()
     };
     onMessagesUpdate([welcomeMessage]);
+  };
+
+  const createNewSession = async (): Promise<void> => {
+    try {
+      const session = await apiClient.createSession();
+      setThreadId(session.session_id);
+      clearChat();
+      console.log('새 세션 생성됨:', session.session_id);
+    } catch (error) {
+      console.error('세션 생성 실패:', error);
+    }
   };
 
   return (
     <div className="chat-container">
       <div className="chat-header">
         <div className="header-left">
-          <h1>LangGraph Agent Chat</h1>
+          <h1>Grafana AI Assistant</h1>
           <div className="connection-status">
             <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></span>
             {isConnected ? 'Connected' : 'Disconnected'}
           </div>
+          {threadId && (
+            <div className="thread-info">
+              <small>Thread: {threadId.substring(0, 8)}...</small>
+            </div>
+          )}
         </div>
         <div className="header-right">
+          <button onClick={createNewSession} className="new-session-button">
+            새 세션
+          </button>
           <button onClick={clearChat} className="clear-button">
             채팅 지우기
           </button>
@@ -190,15 +223,39 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className="messages-container">
         {messages.length === 0 ? (
           <div className="welcome-message">
-            <h3>Grafana 모니터링 에이전트에 오신 것을 환영합니다!</h3>
-            <p>다음과 같은 요청을 할 수 있습니다:</p>
-            <ul>
-              <li>📊 시스템 메트릭 분석 (CPU, 메모리, 디스크)</li>
-              <li>📈 애플리케이션 성능 분석</li>
-              <li>🖼️ 대시보드 이미지 생성</li>
-              <li>🖥️ 서버 정보 조회</li>
-            </ul>
-            <p>무엇을 도와드릴까요?</p>
+            <h3>Grafana AI 어시스턴트에 오신 것을 환영합니다!</h3>
+            <p>Grafana 모니터링 시스템을 전문적으로 지원합니다.</p>
+            <div className="feature-grid">
+              <div className="feature-item">
+                <span className="feature-icon">📊</span>
+                <div>
+                  <strong>데이터 분석</strong>
+                  <p>대시보드 데이터 조회 및 메트릭 분석</p>
+                </div>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">📈</span>
+                <div>
+                  <strong>성능 모니터링</strong>
+                  <p>시스템 성능 및 리소스 사용률 확인</p>
+                </div>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">🖼️</span>
+                <div>
+                  <strong>시각화</strong>
+                  <p>차트 생성 및 대시보드 렌더링</p>
+                </div>
+              </div>
+              <div className="feature-item">
+                <span className="feature-icon">⚙️</span>
+                <div>
+                  <strong>설정 관리</strong>
+                  <p>알람 설정 및 대시보드 관리</p>
+                </div>
+              </div>
+            </div>
+            <p><strong>예시:</strong> "CPU 사용률을 확인해줘", "메모리 사용량 차트를 만들어줘"</p>
           </div>
         ) : (
           messages.map((message: ChatMessage, index: number) => (
@@ -225,7 +282,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           type="text"
           value={input}
           onChange={handleInputChange}
-          placeholder="메시지를 입력하세요... (예: CPU 사용률을 확인해줘)"
+          placeholder="메시지를 입력하세요... (예: CPU 사용률을 확인해줘, 대시보드를 렌더링해줘)"
           disabled={isLoading || isStreaming}
           className="message-input"
         />

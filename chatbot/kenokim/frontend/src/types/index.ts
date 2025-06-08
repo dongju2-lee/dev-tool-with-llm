@@ -30,6 +30,40 @@ export interface ChatMessage {
   timestamp?: Date;
 }
 
+export interface ApiChatRequest {
+  content: string;
+  thread_id?: string;
+  model_settings?: {
+    model?: string;
+    timeout_seconds?: number;
+  };
+}
+
+export interface ApiChatResponse {
+  id: string;
+  role: string;
+  content: string;
+  type: string;
+  timestamp: string;
+  metadata?: {
+    thread_id?: string;
+    agent_used?: string;
+    tools_used?: string[];
+    supervisor_reasoning?: string;
+  };
+}
+
+export interface ApiSessionResponse {
+  session_id: string;
+  created_at: string;
+}
+
+export interface ApiHealthResponse {
+  status: string;
+  timestamp: string;
+  version: string;
+}
+
 export interface SessionConfig {
   configurable: {
     thread_id: string;

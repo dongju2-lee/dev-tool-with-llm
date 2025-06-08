@@ -12,7 +12,6 @@ interface ChatSession {
 }
 
 const App: React.FC = () => {
-  const [isSidebarOpen, setIsSidebarOpen] = useState<boolean>(true);
   const [chatHistory, setChatHistory] = useState<ChatSession[]>([]);
   const [currentChatId, setCurrentChatId] = useState<string>('');
   const [currentMessages, setCurrentMessages] = useState<ChatMessage[]>([]);
@@ -61,7 +60,7 @@ const App: React.FC = () => {
       timestamp: new Date(),
       messages: [{
         role: 'assistant',
-        content: '안녕하세요! LangGraph Agent에 오신 것을 환영합니다. devops 작업을 도와줄 수 있습니다. 무엇을 도와드릴까요?',
+        content: '안녕하세요! LangGraph 전문 AI 어시스턴트입니다. 다음과 같은 업무를 도와드릴 수 있습니다:\n\n📊 그래프 워크플로우 설계 및 분석\n📈 에이전트 시스템 구축 및 최적화\n🖼️ 복잡한 AI 파이프라인 시각화\n⚙️ 상태 관리 및 멀티 에이전트 관리\n\n무엇을 도와드릴까요?',
         timestamp: new Date()
       }]
     };
@@ -78,11 +77,6 @@ const App: React.FC = () => {
     }
   }, [chatHistory]);
 
-  // 사이드바 토글
-  const toggleSidebar = (): void => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
-
   // 새 채팅 생성
   const handleNewChat = (): void => {
     const newChatId = `chat_${Date.now()}`;
@@ -92,7 +86,7 @@ const App: React.FC = () => {
       timestamp: new Date(),
       messages: [{
         role: 'assistant',
-        content: '안녕하세요! LangGraph Agent에 오신 것을 환영합니다. Grafana 모니터링 시스템을 도와드릴 수 있습니다. 무엇을 도와드릴까요?',
+        content: '안녕하세요! LangGraph 전문 AI 어시스턴트입니다. 다음과 같은 업무를 도와드릴 수 있습니다:\n\n📊 그래프 워크플로우 설계 및 분석\n📈 에이전트 시스템 구축 및 최적화\n🖼️ 복잡한 AI 파이프라인 시각화\n⚙️ 상태 관리 및 멀티 에이전트 관리\n\n무엇을 도와드릴까요?',
         timestamp: new Date()
       }]
     };
@@ -155,24 +149,40 @@ const App: React.FC = () => {
     setCurrentMessages(newMessages);
   };
 
-  // 메인 콘텐츠 영역 마진 계산
-  const getMainContentStyle = () => ({
-    marginLeft: isSidebarOpen ? '280px' : '60px',
-    transition: 'margin-left 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-  });
+  // 채팅 삭제
+  const handleDeleteChat = (chatId: string): void => {
+    setChatHistory(prev => {
+      const newHistory = prev.filter(chat => chat.id !== chatId);
+      
+      // 삭제된 채팅이 현재 선택된 채팅인 경우
+      if (currentChatId === chatId) {
+        if (newHistory.length > 0) {
+          // 다른 채팅이 있으면 첫 번째 채팅으로 이동
+          const firstChat = newHistory[0];
+          setCurrentChatId(firstChat.id);
+          setCurrentMessages(firstChat.messages);
+        } else {
+          // 모든 채팅이 삭제되면 새 채팅 생성
+          createInitialChat();
+          return []; // 이 경우 createInitialChat에서 새로운 히스토리를 설정하므로 빈 배열 반환
+        }
+      }
+      
+      return newHistory;
+    });
+  };
 
   return (
     <div className="App">
       <Sidebar
-        isOpen={isSidebarOpen}
-        onToggle={toggleSidebar}
         onNewChat={handleNewChat}
         chatHistory={chatHistory}
         onSelectChat={handleSelectChat}
+        onDeleteChat={handleDeleteChat}
         currentChatId={currentChatId}
       />
       
-      <div className="main-content" style={getMainContentStyle()}>
+      <div className="main-content">
         <ChatInterface
           messages={currentMessages}
           onMessagesUpdate={handleMessagesUpdate}

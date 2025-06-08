@@ -3,8 +3,6 @@ import { ChatMessage } from '../types';
 import './Sidebar.css';
 
 interface SidebarProps {
-  isOpen: boolean;
-  onToggle: () => void;
   onNewChat: () => void;
   chatHistory: Array<{
     id: string;
@@ -13,15 +11,15 @@ interface SidebarProps {
     messages: ChatMessage[];
   }>;
   onSelectChat: (chatId: string) => void;
+  onDeleteChat: (chatId: string) => void;
   currentChatId?: string;
 }
 
 const Sidebar: React.FC<SidebarProps> = ({
-  isOpen,
-  onToggle,
   onNewChat,
   chatHistory,
   onSelectChat,
+  onDeleteChat,
   currentChatId
 }) => {
   const [hoveredChat, setHoveredChat] = useState<string | null>(null);
@@ -50,114 +48,81 @@ const Sidebar: React.FC<SidebarProps> = ({
     return timestamp.toLocaleDateString('ko-KR');
   };
 
-  return (
-    <>
-      {/* 사이드바 오버레이 (모바일용) */}
-      {isOpen && (
-        <div 
-          className="sidebar-overlay"
-          onClick={onToggle}
-        />
-      )}
-      
-      {/* 사이드바 */}
-      <div className={`sidebar ${isOpen ? 'sidebar-open' : 'sidebar-closed'}`}>
-        {/* 헤더 */}
-        <div className="sidebar-header">
-          <button 
-            className="sidebar-toggle-btn"
-            onClick={onToggle}
-            aria-label="사이드바 토글"
-          >
-            <span className="hamburger-icon">
-              <span></span>
-              <span></span>
-              <span></span>
-            </span>
-          </button>
-          
-          {isOpen && (
-            <button 
-              className="new-chat-btn"
-              onClick={onNewChat}
-            >
-              <span className="plus-icon">+</span>
-              새 채팅
-            </button>
-          )}
-        </div>
+  const handleDeleteClick = (e: React.MouseEvent, chatId: string) => {
+    e.stopPropagation(); // 채팅 선택을 방지
+    onDeleteChat(chatId);
+  };
 
-        {/* 채팅 히스토리 */}
-        {isOpen && (
-          <div className="sidebar-content">
-            <div className="chat-history-section">
-              <h3 className="section-title">채팅 기록</h3>
-              
-              {chatHistory.length === 0 ? (
-                <div className="empty-history">
-                  <p>채팅 기록이 없습니다</p>
-                  <span>새 채팅을 시작해보세요!</span>
+  return (
+    <div className="sidebar open">
+      {/* 헤더 */}
+      <div className="sidebar-header">
+        <div className="sidebar-logo">
+          <div className="logo-icon">🔗</div>
+          <span className="logo-text">LangGraph AI</span>
+        </div>
+        
+        <button 
+          className="new-chat-button"
+          onClick={onNewChat}
+          title="새 채팅 시작"
+        >
+          <span>+</span>
+          <span className="button-text">새 채팅</span>
+        </button>
+      </div>
+
+      {/* 채팅 목록 */}
+      <div className="chat-list">
+        {chatHistory.length === 0 ? (
+          <div className="empty-chat-list">
+            아직 채팅 기록이 없습니다.<br />
+            새 채팅을 시작해보세요!
+          </div>
+        ) : (
+          chatHistory.map((chat) => (
+            <div
+              key={chat.id}
+              className={`chat-item ${currentChatId === chat.id ? 'active' : ''}`}
+              onClick={() => onSelectChat(chat.id)}
+              onMouseEnter={() => setHoveredChat(chat.id)}
+              onMouseLeave={() => setHoveredChat(null)}
+            >
+              <div className="chat-content">
+                <div className="chat-title">
+                  {chat.title || formatChatTitle(chat.messages)}
                 </div>
-              ) : (
-                <div className="chat-history-list">
-                  {chatHistory.map((chat) => (
-                    <div
-                      key={chat.id}
-                      className={`chat-history-item ${
-                        currentChatId === chat.id ? 'active' : ''
-                      }`}
-                      onClick={() => onSelectChat(chat.id)}
-                      onMouseEnter={() => setHoveredChat(chat.id)}
-                      onMouseLeave={() => setHoveredChat(null)}
-                    >
-                      <div className="chat-title">
-                        {chat.title || formatChatTitle(chat.messages)}
-                      </div>
-                      <div className="chat-timestamp">
-                        {formatTimestamp(chat.timestamp)}
-                      </div>
-                      
-                      {hoveredChat === chat.id && (
-                        <div className="chat-actions">
-                          <button 
-                            className="delete-chat-btn"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              // TODO: 삭제 기능 구현
-                            }}
-                            aria-label="채팅 삭제"
-                          >
-                            🗑️
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                <div className="chat-timestamp">
+                  {formatTimestamp(chat.timestamp)}
                 </div>
+              </div>
+              {hoveredChat === chat.id && (
+                <button
+                  className="delete-chat-button"
+                  onClick={(e) => handleDeleteClick(e, chat.id)}
+                  title="채팅 삭제"
+                >
+                  ×
+                </button>
               )}
             </div>
-
-            {/* 하단 메뉴 */}
-            <div className="sidebar-footer">
-              <div className="footer-menu">
-                <button className="footer-menu-item">
-                  <span className="menu-icon">⚙️</span>
-                  설정
-                </button>
-                <button className="footer-menu-item">
-                  <span className="menu-icon">ℹ️</span>
-                  정보
-                </button>
-                <button className="footer-menu-item">
-                  <span className="menu-icon">📖</span>
-                  도움말
-                </button>
-              </div>
-            </div>
-          </div>
+          ))
         )}
       </div>
-    </>
+
+      {/* 푸터 */}
+      <div className="sidebar-footer">
+        <div className="sidebar-footer-content">
+          <div className="footer-text">
+            LangGraph 전문<br />
+            AI 어시스턴트
+          </div>
+          <div className="footer-version">
+            v1.0.0
+          </div>
+        </div>
+      </div>
+    </div>
   );
 };
 

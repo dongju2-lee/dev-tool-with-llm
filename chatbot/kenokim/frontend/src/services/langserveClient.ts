@@ -1,26 +1,53 @@
-import { Client } from "@langchain/langgraph-sdk";
 import config from '../config/environment';
-import { 
-  AgentMessage, 
-  AgentInput, 
-  AgentResponse, 
-  AgentConfig, 
-  StreamChunk 
-} from '../types';
 
-class LangServeClient {
+export interface ChatRequest {
+  content: string;
+  thread_id?: string;
+  model_settings?: {
+    model?: string;
+    timeout_seconds?: number;
+  };
+}
+
+export interface ChatResponse {
+  id: string;
+  role: string;
+  content: string;
+  type: string;
+  timestamp: string;
+  metadata?: {
+    thread_id?: string;
+    agent_used?: string;
+    tools_used?: string[];
+    supervisor_reasoning?: string;
+  };
+}
+
+export interface StreamChatRequest {
+  content: string;
+  thread_id?: string;
+  model_settings?: {
+    model?: string;
+    timeout_seconds?: number;
+  };
+}
+
+export interface SessionCreateResponse {
+  session_id: string;
+  created_at: string;
+}
+
+export interface HealthCheckResponse {
+  status: string;
+  timestamp: string;
+  version: string;
+}
+
+class ApiClient {
   private baseUrl: string;
-  private client: Client;
 
   constructor() {
     this.baseUrl = config.API_BASE_URL;
-    this.client = this.createClient();
-  }
-
-  private createClient(): Client {
-    return new Client({
-      apiUrl: this.baseUrl,
-    });
   }
 
   private getHeaders(): Record<string, string> {
@@ -29,36 +56,54 @@ class LangServeClient {
     };
   }
 
-  // 단일 응답 호출
-  async invoke(input: AgentInput, config: AgentConfig = {}): Promise<AgentResponse> {
+  // 일반 채팅
+  async sendMessage(content: string, threadId?: string): Promise<ChatResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/invoke`, {
+      const request: ChatRequest = {
+        content,
+        thread_id: threadId,
+        model_settings: {
+          model: "gemini-2.5-flash-preview",
+          timeout_seconds: 60
+        }
+      };
+
+      const response = await fetch(`${this.baseUrl}/api/v1/chat`, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({ input, config }),
+        body: JSON.stringify(request),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json() as AgentResponse;
+      return await response.json() as ChatResponse;
     } catch (error: any) {
-      console.error("Agent invocation error:", error);
+      console.error("Chat API error:", error);
       throw error;
     }
   }
 
-  // 스트리밍 응답 호출
-  async* stream(input: AgentInput, config: AgentConfig = {}): AsyncGenerator<StreamChunk, void, unknown> {
+  // 스트리밍 채팅
+  async* streamMessage(content: string, threadId?: string): AsyncGenerator<string, void, unknown> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/stream`, {
+      const request: StreamChatRequest = {
+        content,
+        thread_id: threadId,
+        model_settings: {
+          model: "gemini-2.5-flash-preview",
+          timeout_seconds: 60
+        }
+      };
+
+      const response = await fetch(`${this.baseUrl}/api/v1/chat/stream`, {
         method: 'POST',
         headers: {
           ...this.getHeaders(),
           'Accept': 'text/event-stream',
         },
-        body: JSON.stringify({ input, config }),
+        body: JSON.stringify(request),
       });
 
       if (!response.ok) {
@@ -83,9 +128,15 @@ class LangServeClient {
 
         for (const line of lines) {
           if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim();
+            if (data === '[DONE]') {
+              return;
+            }
             try {
-              const data = JSON.parse(line.slice(6));
-              yield data as StreamChunk;
+              const parsed = JSON.parse(data);
+              if (parsed.content) {
+                yield parsed.content;
+              }
             } catch (e) {
               console.warn('Failed to parse streaming data:', line);
             }
@@ -93,27 +144,59 @@ class LangServeClient {
         }
       }
     } catch (error: any) {
-      console.error("Agent streaming error:", error);
+      console.error("Streaming API error:", error);
       throw error;
     }
   }
 
-  // 배치 처리
-  async batch(inputs: AgentInput[], config: AgentConfig = {}): Promise<AgentResponse[]> {
+  // 세션 생성
+  async createSession(): Promise<SessionCreateResponse> {
     try {
-      const response = await fetch(`${this.baseUrl}/agent/batch`, {
+      const response = await fetch(`${this.baseUrl}/api/v1/sessions`, {
         method: 'POST',
         headers: this.getHeaders(),
-        body: JSON.stringify({ inputs, config }),
       });
 
       if (!response.ok) {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      return await response.json() as AgentResponse[];
+      return await response.json() as SessionCreateResponse;
     } catch (error: any) {
-      console.error("Agent batch error:", error);
+      console.error("Session creation error:", error);
+      throw error;
+    }
+  }
+
+  // 세션 삭제
+  async deleteSession(sessionId: string): Promise<void> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/v1/sessions/${sessionId}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+    } catch (error: any) {
+      console.error("Session deletion error:", error);
+      throw error;
+    }
+  }
+
+  // 헬스체크
+  async healthCheck(): Promise<HealthCheckResponse> {
+    try {
+      const response = await fetch(`${this.baseUrl}/api/v1/health`);
+      
+      if (!response.ok) {
+        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+      }
+
+      return await response.json() as HealthCheckResponse;
+    } catch (error: any) {
+      console.error("Health check error:", error);
       throw error;
     }
   }
@@ -121,12 +204,12 @@ class LangServeClient {
   // 연결 테스트
   async testConnection(): Promise<boolean> {
     try {
-      const response = await fetch(`${this.baseUrl}/health`);
-      return response.ok;
+      await this.healthCheck();
+      return true;
     } catch {
       return false;
     }
   }
 }
 
-export default new LangServeClient(); 
+export default new ApiClient(); 

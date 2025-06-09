@@ -10,7 +10,7 @@ from ...core.config import settings
 
 class RouteQuery(BaseModel):
     """라우팅 결정을 위한 스키마"""
-    next: Literal["grafana_agent", "grafana_renderer_agent", "FINISH"] = Field(
+    next: Literal["grafana_agent", "grafana_renderer_mcp_agent", "FINISH"] = Field(
         description="다음에 호출할 에이전트를 선택합니다"
     )
     reasoning: str = Field(
@@ -43,7 +43,7 @@ def create_supervisor_node():
    - 시스템 상태 및 성능 데이터 분석
    - 대시보드 설정 및 관리
 
-2. **grafana_renderer_agent**: 
+2. **grafana_renderer_mcp_agent**: 
    - Grafana 대시보드 시각화 및 렌더링
    - 차트, 그래프 이미지 생성
    - 대시보드 스크린샷 및 리포트 생성
@@ -54,7 +54,7 @@ def create_supervisor_node():
 
 **에이전트 선택 가이드:**
 - 사용자가 데이터 조회, 분석, 설정을 원한다면 → grafana_agent
-- 사용자가 차트, 이미지, 시각화를 원한다면 → grafana_renderer_agent
+- 사용자가 차트, 이미지, 시각화를 원한다면 → grafana_renderer_mcp_agent
 - Grafana 관련이 아닌 요청은 적절히 안내 후 → FINISH
 
 사용자의 요청을 신중히 분석하고, 가장 적절한 에이전트를 선택하세요.

@@ -7,7 +7,6 @@ from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
 
 from dotenv import load_dotenv
-from ..mcp.grafana_client import get_grafana_mcp_client
 from ...core.config import settings
 
 load_dotenv()

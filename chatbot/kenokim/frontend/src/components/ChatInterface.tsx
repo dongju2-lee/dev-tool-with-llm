@@ -178,7 +178,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const clearChat = (): void => {
     const welcomeMessage: ChatMessage = {
       role: 'assistant',
-      content: '안녕하세요! Grafana 모니터링 전문 AI 어시스턴트입니다. 다음과 같은 업무를 도와드릴 수 있습니다:\n\n📊 Grafana 대시보드 데이터 조회 및 분석\n📈 시스템 메트릭 및 성능 분석\n🖼️ 대시보드 시각화 및 차트 생성\n⚙️ 알람 설정 및 모니터링 관리\n\n무엇을 도와드릴까요?',
+      content: '안녕하세요! LangGraph AI 어시스턴트입니다. 다음과 같은 업무를 도와드릴 수 있습니다:\n\n🔗 LangGraph 워크플로우 설계 및 구축\n⚡ 에이전트 시스템 개발 및 최적화\n🤖 AI 에이전트 간 협업 구성\n📊 복잡한 멀티 에이전트 아키텍처 설계\n\n무엇을 도와드릴까요?',
       timestamp: new Date()
     };
     onMessagesUpdate([welcomeMessage]);
@@ -199,7 +199,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     <div className="chat-container">
       <div className="chat-header">
         <div className="header-left">
-          <h1>Grafana AI Assistant</h1>
+          <h1>LangGraph AI Assistant</h1>
           <div className="connection-status">
             <span className={`status-indicator ${isConnected ? 'connected' : 'disconnected'}`}></span>
             {isConnected ? 'Connected' : 'Disconnected'}
@@ -223,39 +223,39 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       <div className="messages-container">
         {messages.length === 0 ? (
           <div className="welcome-message">
-            <h3>Grafana AI 어시스턴트에 오신 것을 환영합니다!</h3>
-            <p>Grafana 모니터링 시스템을 전문적으로 지원합니다.</p>
-            <div className="feature-grid">
-              <div className="feature-item">
-                <span className="feature-icon">📊</span>
-                <div>
-                  <strong>데이터 분석</strong>
-                  <p>대시보드 데이터 조회 및 메트릭 분석</p>
+            <h3>LangGraph AI 어시스턴트에 오신 것을 환영합니다!</h3>
+            <p>LangGraph 워크플로우 및 에이전트 시스템을 전문적으로 지원합니다.</p>
+                          <div className="feature-grid">
+                <div className="feature-item">
+                  <span className="feature-icon">🔗</span>
+                  <div>
+                    <strong>워크플로우 설계</strong>
+                    <p>복잡한 LangGraph 워크플로우 구축 및 최적화</p>
+                  </div>
+                </div>
+                <div className="feature-item">
+                  <span className="feature-icon">⚡</span>
+                  <div>
+                    <strong>에이전트 개발</strong>
+                    <p>AI 에이전트 시스템 설계 및 구현</p>
+                  </div>
+                </div>
+                <div className="feature-item">
+                  <span className="feature-icon">🤖</span>
+                  <div>
+                    <strong>멀티 에이전트</strong>
+                    <p>에이전트 간 협업 및 통신 구성</p>
+                  </div>
+                </div>
+                <div className="feature-item">
+                  <span className="feature-icon">📊</span>
+                  <div>
+                    <strong>아키텍처 설계</strong>
+                    <p>확장 가능한 에이전트 아키텍처 구축</p>
+                  </div>
                 </div>
               </div>
-              <div className="feature-item">
-                <span className="feature-icon">📈</span>
-                <div>
-                  <strong>성능 모니터링</strong>
-                  <p>시스템 성능 및 리소스 사용률 확인</p>
-                </div>
-              </div>
-              <div className="feature-item">
-                <span className="feature-icon">🖼️</span>
-                <div>
-                  <strong>시각화</strong>
-                  <p>차트 생성 및 대시보드 렌더링</p>
-                </div>
-              </div>
-              <div className="feature-item">
-                <span className="feature-icon">⚙️</span>
-                <div>
-                  <strong>설정 관리</strong>
-                  <p>알람 설정 및 대시보드 관리</p>
-                </div>
-              </div>
-            </div>
-            <p><strong>예시:</strong> "CPU 사용률을 확인해줘", "메모리 사용량 차트를 만들어줘"</p>
+            <p><strong>예시:</strong> "LangGraph 워크플로우를 설계해줘", "멀티 에이전트 시스템을 구성하는 방법을 알려줘"</p>
           </div>
         ) : (
           messages.map((message: ChatMessage, index: number) => (
@@ -282,7 +282,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           type="text"
           value={input}
           onChange={handleInputChange}
-          placeholder="메시지를 입력하세요... (예: CPU 사용률을 확인해줘, 대시보드를 렌더링해줘)"
+          placeholder="메시지를 입력하세요... (예: LangGraph 워크플로우 설계, 멀티 에이전트 구성)"
           disabled={isLoading || isStreaming}
           className="message-input"
         />

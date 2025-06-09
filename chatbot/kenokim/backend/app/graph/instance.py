@@ -9,6 +9,8 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from .state import AgentState
 from .agents.supervisor import create_supervisor_node
+from .agents.grafana_mcp_agent import make_grafana_agent
+from .agents.grafana_renderer_mcp_agent import make_grafana_renderer_agent
 from ..core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -81,7 +83,7 @@ class AgentGraphBuilder:
         
         return agent_node
     
-    def build(self):
+    async def build(self):
         """StateGraph를 구성하고 반환합니다."""
         
         # 그래프 생성
@@ -91,16 +93,12 @@ class AgentGraphBuilder:
         supervisor_node = create_supervisor_node()
         graph.add_node("supervisor", supervisor_node)
         
-        # 간단한 에이전트들 생성
-        grafana_prompt = """당신은 Grafana 모니터링 시스템 전문 AI 어시스턴트입니다.
-사용자의 Grafana 관련 질문에 대해 전문적이고 도움이 되는 답변을 제공하세요.
-대시보드, 메트릭, 알람, 데이터 소스 등 Grafana의 모든 기능에 대해 안내할 수 있습니다."""
+        # 실제 MCP 에이전트들 생성
+        grafana_mcp_agent = await make_grafana_agent(self.model)
+        grafana_renderer_mcp_agent = make_grafana_renderer_agent(self.model)
 
-        grafana_renderer_prompt = """당신은 Grafana 대시보드 시각화 및 렌더링 전문 AI 어시스턴트입니다.
-대시보드 이미지 생성, 차트 렌더링, 시각화 최적화 등에 대해 전문적인 조언을 제공하세요."""
-
-        graph.add_node("grafana_agent", self._create_simple_agent("grafana_agent", grafana_prompt))
-        graph.add_node("grafana_renderer_agent", self._create_simple_agent("grafana_renderer_agent", grafana_renderer_prompt))
+        graph.add_node("grafana_agent", grafana_mcp_agent)
+        graph.add_node("grafana_renderer_mcp_agent", grafana_renderer_mcp_agent)
         
         # 라우팅 함수
         def route_to_next(state: AgentState) -> str:
@@ -117,12 +115,12 @@ class AgentGraphBuilder:
             route_to_next,
             {
                 "grafana_agent": "grafana_agent",
-                "grafana_renderer_agent": "grafana_renderer_agent",
+                "grafana_renderer_mcp_agent": "grafana_renderer_mcp_agent",
                 END: END
             }
         )
         graph.add_edge("grafana_agent", END)
-        graph.add_edge("grafana_renderer_agent", END)
+        graph.add_edge("grafana_renderer_mcp_agent", END)
         
         # 체크포인터 추가 (메모리 기능)
         checkpointer = MemorySaver()
@@ -141,7 +139,7 @@ async def get_app_graph():
         try:
             logger.info("LangGraph initialization started...")
             builder = AgentGraphBuilder()
-            _app_graph = builder.build()
+            _app_graph = await builder.build()
             logger.info("LangGraph initialization completed.")
         except Exception as e:
             logger.error(f"Failed to initialize LangGraph: {str(e)}")

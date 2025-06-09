@@ -59,6 +59,16 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const newMessages = [...messages, userMessage];
     onMessagesUpdate(newMessages);
     
+    // 로딩 메시지 추가
+    const loadingMessage: ChatMessage = {
+      role: 'assistant',
+      content: '답변을 생성하고 있습니다...',
+      isStreaming: true,
+      timestamp: new Date()
+    };
+    const messagesWithLoading = [...newMessages, loadingMessage];
+    onMessagesUpdate(messagesWithLoading);
+    
     const currentInput = input;
     setInput('');
     setIsLoading(true);
@@ -118,15 +128,15 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     setInput('');
     setIsStreaming(true);
 
-    // 스트리밍용 임시 메시지 추가
-    const tempMessage: ChatMessage = { 
+    // 스트리밍용 로딩 메시지 추가
+    const loadingMessage: ChatMessage = { 
       role: 'assistant', 
-      content: '', 
+      content: '답변을 생성하고 있습니다...', 
       isStreaming: true,
       timestamp: new Date()
     };
-    const messagesWithTemp = [...newMessages, tempMessage];
-    onMessagesUpdate(messagesWithTemp);
+    const messagesWithLoading = [...newMessages, loadingMessage];
+    onMessagesUpdate(messagesWithLoading);
 
     try {
       let fullContent = '';
@@ -195,6 +205,68 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
+  // 메시지 내용에서 base64 이미지를 감지하고 렌더링하는 함수
+  const renderMessageContent = (content: string) => {
+    // base64 이미지 패턴 감지
+    const base64ImageRegex = /[A-Za-z0-9+/]{100,}={0,2}/g;
+    const dataImageRegex = /data:image\/[^;]+;base64,([A-Za-z0-9+/]+=*)/g;
+    
+    // data:image 형식 먼저 확인
+    const dataImageMatches = content.match(dataImageRegex);
+    if (dataImageMatches) {
+      const parts = content.split(dataImageRegex);
+      return (
+        <div>
+          {parts.map((part, index) => {
+            if (dataImageMatches.includes(part)) {
+              return (
+                <div key={index} className="image-container">
+                  <img 
+                    src={part} 
+                    alt="Generated dashboard" 
+                    style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', marginTop: '10px' }}
+                  />
+                </div>
+              );
+            }
+            return <span key={index}>{part}</span>;
+          })}
+        </div>
+      );
+    }
+    
+    // 단순 base64 문자열 확인 (매우 긴 문자열)
+    const longBase64Matches = content.match(base64ImageRegex);
+    if (longBase64Matches) {
+      // 가장 긴 base64 문자열을 이미지로 가정
+      const longestMatch = longBase64Matches.reduce((a, b) => a.length > b.length ? a : b);
+      
+      if (longestMatch.length > 1000) { // 충분히 긴 경우만 이미지로 처리
+        const parts = content.split(longestMatch);
+        const imageDataUrl = `data:image/png;base64,${longestMatch}`;
+        
+        return (
+          <div>
+            <div>{parts[0]}</div>
+            <div className="image-container">
+              <img 
+                src={imageDataUrl} 
+                alt="Generated dashboard" 
+                style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', margin: '10px 0' }}
+              />
+            </div>
+            <div>{parts[1]}</div>
+          </div>
+        );
+      }
+    }
+    
+    // 일반 텍스트 처리 (줄바꿈 보존)
+    return content.split('\n').map((line, index) => (
+      <div key={index}>{line}</div>
+    ));
+  };
+
   return (
     <div className="chat-container">
       <div className="chat-header">
@@ -259,11 +331,14 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
           </div>
         ) : (
           messages.map((message: ChatMessage, index: number) => (
-            <div key={index} className={`message ${message.role}`}>
+            <div key={index} className={`message ${message.role} ${message.isStreaming ? 'streaming' : ''}`}>
               <div className="message-content">
-                <div className="message-text">
-                  {message.content}
-                  {message.isStreaming && <span className="streaming-indicator">▋</span>}
+                <div 
+                  className="message-text" 
+                  data-loading={message.isStreaming && message.content.includes('답변을 생성하고 있습니다') ? 'true' : 'false'}
+                >
+                  {renderMessageContent(message.content)}
+                  {message.isStreaming && !message.content.includes('답변을 생성하고 있습니다') && <span className="streaming-indicator">▋</span>}
                 </div>
                 {message.timestamp && (
                   <div className="message-timestamp">

@@ -1,134 +1,128 @@
-from typing import List, Literal
-from langchain_core.messages import HumanMessage, SystemMessage
+import logging
+from langgraph_supervisor import create_supervisor
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
-from pydantic import BaseModel, Field
 
-from ..state import AgentState
+from .grafana_mcp_agent import make_grafana_agent
+from .grafana_renderer_mcp_agent import make_grafana_renderer_agent
 from ...core.config import settings
+from dotenv import load_dotenv
 
+load_dotenv()
 
-class RouteQuery(BaseModel):
-    """라우팅 결정을 위한 스키마"""
-    next: Literal["grafana_agent", "grafana_renderer_mcp_agent", "FINISH"] = Field(
-        description="다음에 호출할 에이전트를 선택합니다"
-    )
-    reasoning: str = Field(
-        description="선택한 에이전트의 이유를 설명합니다"
-    )
+# 로깅 설정
+logger = logging.getLogger(__name__)
 
+# init LLM
+llm = ChatGoogleGenerativeAI(
+    model=settings.gemini_model,
+    google_api_key=settings.gemini_api_key,
+    temperature=0
+)
 
-def create_supervisor_node():
-    """Supervisor 노드를 생성합니다."""
+# Agent 설정 정보
+AGENT_CONFIGS = {
+    "grafana_agent": {
+        "description": "Grafana 데이터 분석, 메트릭 조회, 모니터링 정보 제공 전문가",
+        "capabilities": [
+            "시스템 메트릭 분석 (CPU, 메모리, 디스크)",
+            "애플리케이션 성능 분석 (응답시간, 에러율)",
+            "HTTP 상태 코드 분석 (2xx, 4xx, 5xx)",
+            "서비스 상태 및 가용성 확인",
+            "로그 분석 및 패턴 감지",
+            "대시보드 데이터 조회 및 분석"
+        ]
+    },
+    "grafana_renderer_mcp_agent": {
+        "description": "Grafana 대시보드 시각화 및 렌더링 전문가",
+        "capabilities": [
+            "대시보드 이미지, 차트 캡처, 시각화",
+            "대시보드 목록 조회 및 정보 제공",
+            "대시보드 스크린샷 및 리포트 생성",
+            "패널별 개별 이미지 렌더링"
+        ]
+    }
+}
+
+def generate_supervisor_prompt(agent_configs: dict) -> str:
+    """Agent 설정 정보를 기반으로 Supervisor 프롬프트를 자동 생성합니다."""
     
-    # Gemini 모델 초기화
-    llm = ChatGoogleGenerativeAI(
-        model=settings.gemini_model,
-        google_api_key=settings.gemini_api_key,
-        temperature=0.1
-    )
+    agent_descriptions = []
+    for agent_name, config in agent_configs.items():
+        capabilities = "\n  * ".join(config["capabilities"])
+        agent_desc = f"{agent_name}: {config['description']}\n  * {capabilities}"
+        agent_descriptions.append(agent_desc)
     
-    # 구조화된 출력을 위해 Pydantic 모델 바인딩
-    structured_llm = llm.with_structured_output(RouteQuery)
-    
-    # Supervisor 프롬프트 템플릿
-    system_prompt = """당신은 Grafana 모니터링 시스템 전문 AI 어시스턴트의 Supervisor입니다.
-사용자의 요청을 분석하여 가장 적절한 Grafana 전문 에이전트에게 작업을 위임해야 합니다.
+    return f"""
+너는 Grafana 모니터링 시스템의 Supervisor Agent입니다.
+사용자의 요청을 분석하고 적절한 전문 에이전트에게 작업을 배분하는 역할을 담당합니다.
 
-사용 가능한 에이전트:
-1. **grafana_agent**: 
-   - Grafana 대시보드 데이터 조회 및 분석
-   - 메트릭 쿼리 및 데이터 분석
-   - 알람 설정 및 모니터링 데이터 확인
-   - 시스템 상태 및 성능 데이터 분석
-   - 대시보드 설정 및 관리
+사용 가능한 전문 에이전트들:
 
-2. **grafana_renderer_mcp_agent**: 
-   - Grafana 대시보드 시각화 및 렌더링
-   - 차트, 그래프 이미지 생성
-   - 대시보드 스크린샷 및 리포트 생성
-   - 시각적 모니터링 자료 제작
+{chr(10).join(agent_descriptions)}
 
-3. **FINISH**: 
-   - 작업이 완료되었거나 더 이상 처리할 내용이 없을 때
-
-**에이전트 선택 가이드:**
-- 사용자가 데이터 조회, 분석, 설정을 원한다면 → grafana_agent
-- 사용자가 차트, 이미지, 시각화를 원한다면 → grafana_renderer_mcp_agent
-- Grafana 관련이 아닌 요청은 적절히 안내 후 → FINISH
+대시보드 관련 요청이 오면 반드시 알맞는 agent에게 위임하여 처리하세요.
+다른 agent에게 명령을 전달한 경우, 반드시 사용자에게는 agent가 반환한 결과를 제공해야 합니다. 
+반드시, "...에게 전달하여 분석하도록 하겠습니다. 분석 결과를 받는 대로 즉시 알려드리겠습니다." 이런 응답은 하지 마세요.
+분석 결과를 반드시 반환해야 합니다.
 
 사용자의 요청을 신중히 분석하고, 가장 적절한 에이전트를 선택하세요.
-선택 이유도 함께 제공해야 합니다."""
+"""
 
-    prompt = ChatPromptTemplate.from_messages([
-        ("system", system_prompt),
-        MessagesPlaceholder(variable_name="messages"),
-        ("human", "위 대화를 바탕으로 다음에 호출할 에이전트를 선택하세요: {current_input}")
-    ])
-    
-    # Supervisor 체인 생성
-    supervisor_chain = prompt | structured_llm
-    
-    def supervisor_node(state: AgentState) -> AgentState:
-        """Supervisor 노드 실행 함수"""
-        try:
-            # metadata 초기화 확인
-            if "metadata" not in state:
-                state["metadata"] = {}
-            
-            # current_input 확인 및 설정
-            current_input = state.get("current_input", "")
-            if not current_input and "messages" in state and state["messages"]:
-                # messages에서 마지막 사용자 메시지 추출
-                last_human_msg = None
-                for msg in reversed(state["messages"]):
-                    if hasattr(msg, 'type') and msg.type == 'human':
-                        last_human_msg = msg
-                        break
-                current_input = last_human_msg.content if last_human_msg else "안녕하세요"
-            
-            # LLM을 통해 라우팅 결정
-            result = supervisor_chain.invoke({
-                "messages": state["messages"],
-                "current_input": current_input
-            })
-            
-            # 상태 업데이트
-            state["next"] = result.next
-            state["current_agent"] = "supervisor"
-            state["metadata"]["supervisor_reasoning"] = result.reasoning
-            
-            # FINISH가 선택되면 직접 응답 생성
-            if result.next == "FINISH":
-                state["is_finished"] = True
-                
-                # 직접 응답 메시지 생성
-                from langchain_core.messages import AIMessage
-                finish_response = AIMessage(
-                    content=f"안녕하세요! 저는 LangGraph AI 어시스턴트입니다.\n\n{result.reasoning}\n\n구체적인 질문이나 요청사항이 있으시면 언제든 말씀해 주세요. 다양한 주제에 대해 도움을 드릴 수 있습니다."
-                )
-                state["messages"].append(finish_response)
-            
-            return state
-            
-        except Exception as e:
-            # 에러 발생 시 metadata 초기화 확인
-            if "metadata" not in state:
-                state["metadata"] = {}
-                
-            # 에러 발생 시 기본값으로 FINISH 선택
-            state["next"] = "FINISH"
-            state["current_agent"] = "supervisor"
-            state["is_finished"] = True
-            state["metadata"]["error"] = f"Supervisor error: {str(e)}"
-            
-            # 에러 시에도 응답 메시지 생성
-            from langchain_core.messages import AIMessage
-            error_response = AIMessage(
-                content=f"죄송합니다. 처리 중 오류가 발생했습니다: {str(e)}\n\n다시 시도해 주시거나 다른 질문을 해주세요."
-            )
-            state["messages"].append(error_response)
-            
-            return state
-    
-    return supervisor_node 
+# 자동 생성된 Supervisor 프롬프트
+SUPERVISOR_PROMPT = generate_supervisor_prompt(AGENT_CONFIGS)
+
+# Supervisor 그래프
+logger.info("Creating supervisor graph...")
+
+async def create_agents():
+    """모든 에이전트를 비동기적으로 생성합니다."""
+    try:
+        grafana_agent = await make_grafana_agent(llm)
+        grafana_renderer_agent = await make_grafana_renderer_agent(llm)
+        return [grafana_agent, grafana_renderer_agent]
+    except Exception as e:
+        logger.error(f"Error creating agents: {e}")
+        raise
+
+async def create_supervisor_graph():
+    """Supervisor 그래프를 비동기적으로 생성합니다."""
+    try:
+        agents = await create_agents()
+        
+        # create_supervisor는 StateGraph를 반환
+        supervisor_graph_builder = create_supervisor(
+            agents=agents,
+            model=llm,
+            prompt=SUPERVISOR_PROMPT,
+            output_mode='full_history'
+        )
+        logger.info("Supervisor graph created successfully")
+        
+        # StateGraph를 컴파일
+        compiled_graph = supervisor_graph_builder.compile()
+        return compiled_graph
+        
+    except Exception as e:
+        logger.error(f"Error creating supervisor graph: {e}")
+        raise
+
+# 전역 변수로 supervisor_graph 저장
+_supervisor_graph = None
+
+async def get_supervisor_graph():
+    """supervisor_graph를 lazy loading으로 가져오기"""
+    global _supervisor_graph
+    if _supervisor_graph is None:
+        _supervisor_graph = await create_supervisor_graph()
+    return _supervisor_graph
+
+# LangGraph 표준 패턴: 직접 그래프 반환
+async def get_graph():
+    """LangGraph 표준 패턴: 컴파일된 그래프를 직접 반환"""
+    return await get_supervisor_graph()
+
+# 이전 코드와의 호환성을 위한 함수들
+def create_supervisor_node():
+    """이전 코드와의 호환성을 위한 함수 - 더 이상 사용하지 않음"""
+    logger.warning("create_supervisor_node() is deprecated. Use get_graph() instead.")
+    return None

@@ -13,3 +13,4 @@ langchain
 langchain-core
 langchain-google-genai
 langchain-mcp-adapters>=0.1.1
+langgraph-supervisor>=0.0.25

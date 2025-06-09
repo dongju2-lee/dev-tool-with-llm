@@ -1,27 +1,13 @@
-from typing import TypedDict, List, Optional, Dict, Any
+from typing import Annotated
+from typing_extensions import TypedDict
+from langgraph.graph.message import add_messages
 from langchain_core.messages import BaseMessage
 
 
-class AgentState(TypedDict):
-    """에이전트 간에 공유되는 대화 상태를 정의합니다."""
-    
-    # 메시지 히스토리
-    messages: List[BaseMessage]
-    
-    # 현재 처리할 사용자 입력
-    current_input: str
-    
-    # 다음에 호출할 에이전트 (Supervisor가 결정)
-    next: Optional[str]
-    
-    # 현재 활성화된 에이전트
-    current_agent: Optional[str]
-    
-    # 작업 완료 여부
-    is_finished: bool
-    
-    # 에이전트 간 컨텍스트 공유를 위한 메타데이터
-    metadata: Dict[str, Any]
-    
-    # 스레드 ID (세션 관리용)
-    thread_id: Optional[str] 
+class GraphState(TypedDict):
+    """LangGraph 표준 State schema"""
+    messages: Annotated[list[BaseMessage], add_messages]
+
+
+# 이전 호환성을 위한 별칭
+AgentState = GraphState 

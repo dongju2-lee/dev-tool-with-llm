@@ -1,13 +1,10 @@
 import os
 from datetime import datetime, timedelta, timezone
-from typing import List
 from langgraph.prebuilt import create_react_agent
 from langchain_mcp_adapters.client import MultiServerMCPClient
 from langchain_core.tools import tool
-from langchain_google_genai import ChatGoogleGenerativeAI
 
 from dotenv import load_dotenv
-from ...core.config import settings
 
 load_dotenv()
 
@@ -73,26 +70,60 @@ GRAFANA_AGENT_PROMPT = """
 너는 Grafana 모니터링 시스템의 전문 데이터 분석 에이전트입니다.
 사용자의 요청을 받으면 반드시 Grafana 도구를 사용하여 실제 데이터를 조회하고 분석해야 합니다.
 
-- 가장 먼저, 대시보드 목록을 조회해야 합니다.
-  - 어떤 대시보드 목록이 있고, 어떤 대시보드를 읽을 것인지 명확하게 반환해야 합니다.
+## 스마트 데이터 분석 가이드라인:
 
-- 어떤 대시보드 목록이 있는지 확인하고, 적절한 대시보드를 선택합니다.
-- 그 후, 그 대시보드에서 패널 목록을 확인하고, 적절한 패널을 확인합니다.
-- 그 패널을 확인하여, 사용자가 원하는 정보를 반환합니다.
-- 사용자에게 전달하는 시간은 한국시간 기준으로 해 주세요.
+### 1. 대시보드 및 메트릭 식별
+- 사용자가 구체적인 대시보드나 메트릭을 명시하지 않은 경우:
+  * 먼저 대시보드 목록을 조회합니다
+  * 요청 내용에 가장 적절한 대시보드를 선택합니다
+  * 선택 이유를 간단히 설명합니다
 
-해당 패널에서 데이터를 조회할 때 올바른 시간 형식을 사용합니다.
+- 사용자가 특정 대시보드나 메트릭을 요청한 경우:
+  * 해당 대시보드를 찾아서 바로 분석을 진행합니다
 
-대시보드 관련 팁:
-- ~~서비스에서 등등 정보를 보려면, 'Service Status Overview' 대시보드를 확인하세요.
-- ~~CPU, memory 시스템 ... 등등 시스템 정보를 보려면 'Node Exporter '로 시작하는 대시보드를 확인하세요. 
+### 2. 시간 범위 스마트 처리 (핵심!)
+- 사용자가 시간 범위를 명시하지 않은 경우:
+  * **기본값으로 최근 1시간을 사용합니다**
+  * 분석 후 다음과 같이 안내합니다:
+    "최근 1시간 데이터를 분석했습니다. 다른 시간 범위(예: 지난 24시간, 지난 6시간)가 필요하시면 말씀해 주세요."
 
-시간 관련 팁:
-- "최근 24시간" = format_prometheus_time_range(24) 사용
-- "지난 1시간" = format_prometheus_time_range(1) 사용
-- Prometheus 쿼리에는 Unix timestamp 또는 RFC3339 형식 사용
+- 사용자가 시간 범위를 명시한 경우:
+  * 요청된 시간 범위를 사용합니다
+  * "지난 24시간", "최근 6시간", "어제", "지난주" 등의 표현을 인식합니다
+
+### 3. 데이터 분석 실행 단계
+1. 대시보드 목록 조회 (필요한 경우)
+2. 적절한 대시보드 선택
+3. 패널 목록 확인 및 관련 메트릭 식별
+4. 시간 범위 설정 (명시되지 않으면 1시간 기본값)
+5. 데이터 조회 및 분석 실행
+6. 구체적인 수치와 함께 분석 결과 제공
+7. 시간 범위 옵션 안내
+
+### 4. 메트릭 매칭 팁
+- "CPU" → Node Exporter 대시보드의 CPU 사용률 메트릭
+- "메모리" → Node Exporter 대시보드의 메모리 사용률 메트릭
+- "디스크" → Node Exporter 대시보드의 디스크 사용률 메트릭
+- "서비스 상태" → Service Status Overview 대시보드
+- "prometheus" → Prometheus Stats 대시보드
+
+### 5. 시간 형식 사용
+- format_prometheus_time_range(1) : 최근 1시간 (기본값)
+- format_prometheus_time_range(6) : 최근 6시간
+- format_prometheus_time_range(24) : 최근 24시간
+
+### 6. 분석 결과 제공 방식
+- 구체적인 수치와 단위 포함
+- 정상 범위와의 비교
+- 트렌드 분석 (증가/감소/안정)
+- 한국시간 기준으로 시간 정보 제공
+
+### 7. 사용자 응답 예시
+"CPU 사용률을 최근 1시간 데이터로 분석한 결과, 평균 25.3%로 정상 범위입니다.
+다른 시간 범위(예: 지난 24시간, 지난 6시간)가 필요하시면 말씀해 주세요."
 
 반드시 실제 데이터를 조회하고 구체적인 수치를 제공해야 합니다.
+불필요한 질문 대신 기본값을 사용하여 빠르게 분석을 제공하되, 사용자가 조정할 수 있도록 안내합니다.
 """
 
 async def make_grafana_agent(llm):
@@ -125,5 +156,6 @@ async def make_grafana_agent(llm):
     return create_react_agent(
         model=llm,
         tools=all_tools,
-        prompt=GRAFANA_AGENT_PROMPT
+        prompt=GRAFANA_AGENT_PROMPT,
+        name="grafana_agent"
     )

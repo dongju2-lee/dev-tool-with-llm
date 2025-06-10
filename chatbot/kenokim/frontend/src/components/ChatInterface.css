@@ -385,6 +385,11 @@
   transition: all 0.2s ease;
   font-family: inherit;
   line-height: 1.5;
+  min-height: 40px;
+  max-height: 120px;
+  overflow-y: auto;
+  vertical-align: top;
+  box-sizing: border-box;
 }
 
 .message-input::placeholder {
@@ -488,6 +493,13 @@
     padding: 16px 20px;
     flex-direction: column;
     gap: 12px;
+  }
+
+  .message-input {
+    min-height: 36px;
+    max-height: 100px;
+    padding: 12px 16px;
+    font-size: 16px; /* iOS에서 줌 방지 */
   }
 
   .button-group {

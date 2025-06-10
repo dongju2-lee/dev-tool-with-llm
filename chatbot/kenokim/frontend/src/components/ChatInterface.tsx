@@ -20,6 +20,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
   const [isConnected, setIsConnected] = useState<boolean>(true);
   const [threadId, setThreadId] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const scrollToBottom = (): void => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -71,6 +72,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     
     const currentInput = input;
     setInput('');
+    // textarea 높이 리셋
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '40px';
+    }
     setIsLoading(true);
 
     try {
@@ -126,6 +131,10 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     
     const currentInput = input;
     setInput('');
+    // textarea 높이 리셋
+    if (textareaRef.current) {
+      textareaRef.current.style.height = '40px';
+    }
     setIsStreaming(true);
 
     // 스트리밍용 로딩 메시지 추가
@@ -181,8 +190,24 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
     }
   };
 
-  const handleInputChange = (e: ChangeEvent<HTMLInputElement>): void => {
+  const handleInputChange = (e: ChangeEvent<HTMLTextAreaElement>): void => {
     setInput(e.target.value);
+    
+    // 자동 높이 조절
+    const textarea = e.target;
+    textarea.style.height = 'auto';
+    textarea.style.height = Math.min(textarea.scrollHeight, 120) + 'px';
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>): void => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      const form = e.currentTarget.closest('form');
+      if (form) {
+        const event = new Event('submit', { cancelable: true });
+        form.dispatchEvent(event);
+      }
+    }
   };
 
   const clearChat = (): void => {
@@ -207,11 +232,74 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // 메시지 내용에서 base64 이미지를 감지하고 렌더링하는 함수
   const renderMessageContent = (content: string) => {
-    // base64 이미지 패턴 감지
+    // 마크다운 이미지 패턴 감지 (![alt](data:image/...))
+    const markdownImageRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/]+=*)\)/g;
+    
+    // 마크다운 이미지 먼저 확인
+    const markdownMatches = Array.from(content.matchAll(markdownImageRegex));
+    if (markdownMatches.length > 0) {
+      let processedContent = content;
+      const elements: (string | React.ReactElement)[] = [];
+      let lastIndex = 0;
+
+      markdownMatches.forEach((match, index) => {
+        const fullMatch = match[0];
+        const altText = match[1];
+        const imageDataUrl = match[2];
+        const matchIndex = match.index!;
+
+        // 이미지 앞의 텍스트 추가
+        if (matchIndex > lastIndex) {
+          const beforeText = content.substring(lastIndex, matchIndex);
+          elements.push(
+            <div key={`text-${index}`}>
+              {beforeText.split('\n').map((line, lineIndex) => (
+                <div key={lineIndex}>{line}</div>
+              ))}
+            </div>
+          );
+        }
+
+        // 이미지 요소 추가
+        elements.push(
+          <div key={`image-${index}`} className="image-container">
+            <img 
+              src={imageDataUrl} 
+              alt={altText || "Generated dashboard"} 
+              style={{ 
+                maxWidth: '100%', 
+                height: 'auto', 
+                borderRadius: '8px', 
+                margin: '10px 0',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+              }}
+            />
+          </div>
+        );
+
+        lastIndex = matchIndex + fullMatch.length;
+      });
+
+      // 마지막 이미지 이후의 텍스트 추가
+      if (lastIndex < content.length) {
+        const afterText = content.substring(lastIndex);
+        elements.push(
+          <div key="text-final">
+            {afterText.split('\n').map((line, lineIndex) => (
+              <div key={lineIndex}>{line}</div>
+            ))}
+          </div>
+        );
+      }
+
+      return <div>{elements}</div>;
+    }
+
+    // base64 이미지 패턴 감지 (백업)
     const base64ImageRegex = /[A-Za-z0-9+/]{100,}={0,2}/g;
     const dataImageRegex = /data:image\/[^;]+;base64,([A-Za-z0-9+/]+=*)/g;
     
-    // data:image 형식 먼저 확인
+    // data:image 형식 확인
     const dataImageMatches = content.match(dataImageRegex);
     if (dataImageMatches) {
       const parts = content.split(dataImageRegex);
@@ -353,13 +441,21 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       </div>
       
       <form className="input-form" onSubmit={handleSubmit}>
-        <input
-          type="text"
+        <textarea
+          ref={textareaRef}
           value={input}
           onChange={handleInputChange}
-          placeholder="메시지를 입력하세요... (예: LangGraph 워크플로우 설계, 멀티 에이전트 구성)"
+          onKeyDown={handleKeyDown}
+          placeholder="메시지를 입력하세요... (예: LangGraph 워크플로우 설계, 멀티 에이전트 구성) | 💡 Shift + Enter: 줄바꿈 | Enter: 전송"
           disabled={isLoading || isStreaming}
           className="message-input"
+          rows={1}
+          style={{
+            minHeight: '40px',
+            maxHeight: '120px',
+            resize: 'none',
+            overflow: 'auto'
+          }}
         />
         <div className="button-group">
           <button 

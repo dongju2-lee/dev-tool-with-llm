@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     
     # Google Gemini API 설정
     gemini_api_key: Optional[str] = Field(default=None, alias="GOOGLE_API_KEY")
-    gemini_model: str = "gemini-2.5-flash-preview-05-20"
+    gemini_model: str = "gemini-2.0-flash"
     
     # MCP 서버 설정
     mcp_client_name: str = Field(default="devops-assistant", alias="MCP_CLIENT_NAME")

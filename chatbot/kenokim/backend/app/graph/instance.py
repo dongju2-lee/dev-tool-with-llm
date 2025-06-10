@@ -12,6 +12,7 @@ logger = logging.getLogger(__name__)
 _app_graph = None
 
 
+
 async def get_app_graph():
     """LangGraph 표준 패턴: 컴파일된 그래프를 가져옵니다."""
     global _app_graph
@@ -39,21 +40,20 @@ async def process_chat_message(content: str, thread_id: Optional[str] = None) ->
         config = {"configurable": {"thread_id": thread_id}} if thread_id else {}
         result = await graph.ainvoke(input_data, config)
         
-        # 결과에서 마지막 AI 메시지 추출 (LangGraph 표준 응답 처리)
-        if "messages" in result and result["messages"]:
-            ai_messages = [msg for msg in result["messages"] 
-                          if hasattr(msg, 'content') and hasattr(msg, 'type') and msg.type == 'ai']
-            final_response = ai_messages[-1].content if ai_messages else "응답을 생성하지 못했습니다."
+        # LangGraph 결과를 그대로 사용 - 마지막 메시지가 최종 응답
+        print(result)
+        messages = result.get("messages", [])
+        if messages:
+            last_message = messages[-1]
+            response_content = last_message.content if hasattr(last_message, 'content') else "응답을 처리하지 못했습니다."
         else:
-            final_response = "응답을 생성하지 못했습니다."
+            response_content = "응답을 생성하지 못했습니다."
         
         return {
-            "content": final_response,
+            "content": response_content,
             "metadata": {
                 "timestamp": datetime.now().isoformat(),
-                "thread_id": thread_id,
-                "message_count": len(result.get("messages", [])),
-                "graph_type": str(type(graph))
+                "thread_id": thread_id
             },
             "agent_used": "supervisor",
             "tools_used": []

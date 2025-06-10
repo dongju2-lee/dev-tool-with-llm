@@ -1,0 +1,449 @@
+{
+  "test_info": {
+    "timestamp": "2025-06-09T22:46:33.652390",
+    "total_tests": 10,
+    "successful_tests": 6
+  },
+  "results": [
+    {
+      "scenario": {
+        "name": "대시보드_목록_요청",
+        "description": "사용 가능한 대시보드 목록을 요청하는 시나리오",
+        "user_input": "대시보드 목록을 보여주세요",
+        "expected_agent": "grafana_renderer_mcp_agent",
+        "category": "dashboard_list"
+      },
+      "response": {
+        "content": "어떤 대시보드를 보고 싶으신가요? 대시보드 이름을 말씀해 주시면 해당 대시보드를 보여드리겠습니다.",
+        "agent_used": "grafana_renderer_mcp_agent",
+        "tools_used": [
+          "transfer_to_grafana_renderer_mcp_agent",
+          "list_dashboards",
+          "transfer_back_to_supervisor"
+        ],
+        "response_length": 54,
+        "execution_time": 9.032374250004068
+      },
+      "evaluation": {
+        "agent_selection_score": 5,
+        "understanding_score": 5,
+        "completeness_score": 2,
+        "quality_score": 3,
+        "overall_score": 3,
+        "total_score": 18,
+        "max_score": 25,
+        "percentage": 72,
+        "success": false,
+        "strengths": [
+          "적절한 에이전트 선택",
+          "사용자 요청 정확히 이해"
+        ],
+        "weaknesses": [
+          "대시보드 목록을 직접 제공하지 않음",
+          "추가적인 사용자 입력 요구"
+        ],
+        "recommendations": [
+          "대시보드 목록을 응답에 포함하여 사용자 편의성 향상",
+          "사용자가 특정 대시보드를 선택할 수 있는 옵션 제공"
+        ],
+        "summary": "적절한 에이전트가 선택되었지만, 대시보드 목록을 직접 제공하지 않고 추가 질문을 던져 응답 완성도가 낮음."
+      },
+      "success": false,
+      "error": null
+    },
+    {
+      "scenario": {
+        "name": "사용가능한_대시보드_문의",
+        "description": "어떤 대시보드가 있는지 자연어로 문의",
+        "user_input": "어떤 대시보드들을 볼 수 있나요?",
+        "expected_agent": "grafana_renderer_mcp_agent",
+        "category": "dashboard_list"
+      },
+      "response": {
+        "content": "어떤 도움이 필요하신가요? \"대시보드 목록 보여줘\", \"특정 대시보드 렌더링\", \"메트릭 분석\" 등 요청을 해주시면, 적절한 에이전트를 통해 상세하고 정확한 결과를 제공해 드리겠습니다.",
+        "agent_used": "grafana_renderer_mcp_agent",
+        "tools_used": [
+          "transfer_to_grafana_renderer_mcp_agent",
+          "list_dashboards",
+          "transfer_back_to_supervisor"
+        ],
+        "response_length": 103,
+        "execution_time": 4.669914499856532
+      },
+      "evaluation": {
+        "agent_selection_score": 5,
+        "understanding_score": 3,
+        "completeness_score": 1,
+        "quality_score": 2,
+        "overall_score": 2,
+        "total_score": 13,
+        "max_score": 25,
+        "percentage": 52,
+        "success": false,
+        "strengths": [
+          "적절한 에이전트 선택"
+        ],
+        "weaknesses": [
+          "요청에 대한 직접적인 답변 부족",
+          "불필요한 추가 질문 유도",
+          "대시보드 목록을 바로 제공하지 않음"
+        ],
+        "recommendations": [
+          "사용자 요청에 따라 대시보드 목록을 즉시 제공하도록 개선",
+          "추가 질문 없이 바로 정보를 제공하는 방향으로 응답 방식 변경",
+          "list_dashboards 도구를 활용하여 대시보드 목록을 응답에 포함"
+        ],
+        "summary": "적절한 에이전트가 선택되었으나, 사용자의 요청을 완전히 이해하고 즉각적인 답변을 제공하지 못해 아쉬움."
+      },
+      "success": false,
+      "error": null
+    },
+    {
+      "scenario": {
+        "name": "특정_대시보드_렌더링",
+        "description": "Node Exporter Full 대시보드 렌더링 요청",
+        "user_input": "Node Exporter Full 대시보드를 렌더링해주세요",
+        "expected_agent": "grafana_renderer_mcp_agent",
+        "category": "dashboard_render"
+      },
+      "response": {
+        "content": "대시보드 렌더링을 시도했지만 결과를 표시하지 못했습니다. 대시보드 이름을 확인하거나 다시 시도해 주세요.",
+        "agent_used": "grafana_renderer_mcp_agent",
+        "tools_used": [
+          "transfer_to_grafana_renderer_mcp_agent",
+          "render_dashboard",
+          "transfer_back_to_supervisor"
+        ],
+        "response_length": 58,
+        "execution_time": 10.440142459003255
+      },
+      "evaluation": {
+        "agent_selection_score": 5,
+        "understanding_score": 5,
+        "completeness_score": 2,
+        "quality_score": 3,
+        "overall_score": 3,
+        "total_score": 18,
+        "max_score": 25,
+        "percentage": 72,
+        "success": false,
+        "strengths": [
+          "올바른 에이전트 선택",
+          "사용자 요청 정확히 이해"
+        ],
+        "weaknesses": [
+          "대시보드 렌더링 실패",
+          "결과 표시 실패"
+        ],
+        "recommendations": [
+          "대시보드 렌더링 실패 원인 분석 및 해결 (예: Grafana 연결 문제, 대시보드 존재 여부 확인)",
+          "렌더링 실패 시 더 자세한 오류 메시지 제공"
+        ],
+        "summary": "올바른 에이전트가 선택되었고 요청을 잘 이해했지만, 렌더링 실패로 인해 완전한 답변을 제공하지 못했습니다."
+      },
+      "success": false,
+      "error": null
+    },
+    {
+      "scenario": {
+        "name": "대시보드_시각화_요청",
+        "description": "대시보드를 보여달라는 자연어 요청",
+        "user_input": "Prometheus Stats 대시보드를 보여줘",
+        "expected_agent": "grafana_renderer_mcp_agent",
+        "category": "dashboard_render"
+      },
+      "response": {
+        "content": "Prometheus Stats 대시보드를 보여달라고 하셨죠? grafana_renderer_mcp_agent에게 전달했습니다.",
+        "agent_used": "grafana_renderer_mcp_agent",
+        "tools_used": [
+          "transfer_to_grafana_renderer_mcp_agent",
+          "transfer_back_to_supervisor"
+        ],
+        "response_length": 70,
+        "execution_time": 3.022517083911225
+      },
+      "evaluation": {
+        "agent_selection_score": 5,
+        "understanding_score": 5,
+        "completeness_score": 3,
+        "quality_score": 4,
+        "overall_score": 4,
+        "total_score": 21,
+        "max_score": 25,
+        "percentage": 84,
+        "success": true,
+        "strengths": [
+          "올바른 에이전트 선택",
+          "사용자 요청 정확히 이해"
+        ],
+        "weaknesses": [
+          "대시보드 렌더링 결과 직접 제공하지 않음",
+          "중간 전달 과정만 보여줌"
+        ],
+        "recommendations": [
+          "대시보드 렌더링 결과를 사용자에게 직접 보여주도록 개선",
+          "렌더링 성공/실패 여부 및 관련 메시지 제공"
+        ],
+        "summary": "올바른 에이전트를 선택하고 요청을 이해했지만, 대시보드 렌더링 결과를 직접 제공하지 않아 아쉬움."
+      },
+      "success": true,
+      "error": null
+    },
+    {
+      "scenario": {
+        "name": "시스템_성능_분석",
+        "description": "시스템 성능 분석 요청",
+        "user_input": "서버 성능을 분석해주세요",
+        "expected_agent": "grafana_agent",
+        "category": "data_analysis"
+      },
+      "response": {
+        "content": "서버 성능 분석 결과를 요약해서 보여드렸습니다. 더 자세한 분석이나 특정 지표에 대한 심층 분석이 필요하시면 언제든지 말씀해주세요.",
+        "agent_used": "grafana_agent",
+        "tools_used": [
+          "transfer_to_grafana_agent",
+          "search_dashboards",
+          "format_prometheus_time_range",
+          "query_prometheus",
+          "list_datasources",
+          "transfer_back_to_supervisor"
+        ],
+        "response_length": 73,
+        "execution_time": 14.779415459139273
+      },
+      "evaluation": {
+        "agent_selection_score": 5,
+        "understanding_score": 5,
+        "completeness_score": 3,
+        "quality_score": 4,
+        "overall_score": 4,
+        "total_score": 21,
+        "max_score": 25,
+        "percentage": 84,
+        "success": true,
+        "strengths": [
+          "적절한 에이전트 선택",
+          "요청의 핵심 파악 및 관련 도구 활용"
+        ],
+        "weaknesses": [
+          "결과 요약만 제공하고 구체적인 분석 내용 부족",
+          "추가 질문 유도에 그침"
+        ],
+        "recommendations": [
+          "성능 분석 결과에 대한 구체적인 정보 (예: CPU 사용률, 메모리 사용량, 응답 시간 등)를 포함",
+          "분석 결과에 대한 간단한 해석 또는 문제점 진단 제공"
+        ],
+        "summary": "요청을 잘 이해하고 적절한 에이전트를 선택했지만, 분석 결과에 대한 구체적인 정보가 부족하여 아쉬움."
+      },
+      "success": true,
+      "error": null
+    },
+    {
+      "scenario": {
+        "name": "메모리_사용량_확인",
+        "description": "메모리 사용량 확인 요청",
+        "user_input": "현재 메모리 사용량을 확인해주세요",
+        "expected_agent": "grafana_agent",
+        "category": "data_analysis"
+      },
+      "response": {
+        "content": "현재 메모리 사용량은 47.26%입니다.",
+        "agent_used": "grafana_agent",
+        "tools_used": [
+          "transfer_to_grafana_agent",
+          "search_dashboards",
+          "get_dashboard_by_uid",
+          "format_prometheus_time_range",
+          "query_prometheus",
+          "transfer_back_to_supervisor"
+        ],
+        "response_length": 22,
+        "execution_time": 19.0362880830653
+      },
+      "evaluation": {
+        "agent_selection_score": 5,
+        "understanding_score": 5,
+        "completeness_score": 5,
+        "quality_score": 5,
+        "overall_score": 5,
+        "total_score": 25,
+        "max_score": 25,
+        "percentage": 100,
+        "success": true,
+        "strengths": [
+          "적절한 에이전트 선택",
+          "정확한 요청 이해",
+          "명확하고 간결한 응답",
+          "유용한 정보 제공"
+        ],
+        "weaknesses": [],
+        "recommendations": [],
+        "summary": "Grafana Agent가 메모리 사용량 확인 요청에 대해 완벽하게 응답했습니다."
+      },
+      "success": true,
+      "error": null
+    },
+    {
+      "scenario": {
+        "name": "인사_및_소개",
+        "description": "기본적인 인사 및 시스템 소개 요청",
+        "user_input": "안녕하세요, 무엇을 도와드릴 수 있나요?",
+        "expected_agent": "supervisor",
+        "category": "general"
+      },
+      "response": {
+        "content": "안녕하세요! Grafana 관련해서 궁금한 점이나 필요한 작업이 있으시면 말씀해주세요. 어떤 대시보드를 보고 싶으신가요, 아니면 특정 메트릭을 분석하고 싶으신가요? 제가 도와드릴 수 있는 기능은 다음과 같습니다:\n\n- 대시보드 목록을 보여주거나 특정 대시보드의 이미지를 렌더링해 드릴 수 있습니다.\n- CPU, 메모리, 디스크 사용량과 같은 시스템 메트릭을 분석하고 모니터링할 수 있습니다.\n- Grafana 로그를 검색하고 특정 패턴을 찾을 수 있습니다.\n\n어떤 도움이 필요하신가요?",
+        "agent_used": "supervisor",
+        "tools_used": [],
+        "response_length": 271,
+        "execution_time": 1.4053698340430856
+      },
+      "evaluation": {
+        "agent_selection_score": 5,
+        "understanding_score": 5,
+        "completeness_score": 5,
+        "quality_score": 5,
+        "overall_score": 5,
+        "total_score": 25,
+        "max_score": 25,
+        "percentage": 100,
+        "success": true,
+        "strengths": [
+          "친절하고 명확한 인사말",
+          "Grafana 관련 기능 소개의 구체성",
+          "사용자의 다음 행동을 유도하는 질문"
+        ],
+        "weaknesses": [],
+        "recommendations": [],
+        "summary": "supervisor 에이전트가 사용자의 기본적인 인사 요청에 대해 완벽하게 응답했으며, 기능 소개와 함께 다음 단계를 유도하는 훌륭한 답변을 제공했습니다."
+      },
+      "success": true,
+      "error": null
+    },
+    {
+      "scenario": {
+        "name": "도움말_요청",
+        "description": "사용 가능한 기능에 대한 도움말 요청",
+        "user_input": "어떤 기능들을 사용할 수 있나요?",
+        "expected_agent": "supervisor",
+        "category": "general"
+      },
+      "response": {
+        "content": "저는 Grafana 모니터링 시스템의 Supervisor입니다. 어떤 종류의 작업을 도와드릴까요? 대시보드 렌더링, 메트릭 분석, 시스템 상태 확인 등 다양한 기능을 제공합니다. 어떤 기능이 필요하신가요?",
+        "agent_used": "supervisor",
+        "tools_used": [],
+        "response_length": 114,
+        "execution_time": 1.0716216249857098
+      },
+      "evaluation": {
+        "agent_selection_score": 5,
+        "understanding_score": 5,
+        "completeness_score": 3,
+        "quality_score": 4,
+        "overall_score": 4,
+        "total_score": 21,
+        "max_score": 25,
+        "percentage": 84,
+        "success": true,
+        "strengths": [
+          "적절한 에이전트 선택",
+          "사용자 요청의 정확한 이해",
+          "명확하고 유용한 응답"
+        ],
+        "weaknesses": [
+          "기능 목록의 구체성 부족"
+        ],
+        "recommendations": [
+          "사용 가능한 기능 목록을 더 자세하게 제공",
+          "각 기능에 대한 간단한 예시 제공"
+        ],
+        "summary": "Supervisor 에이전트가 사용 가능한 기능에 대한 도움말 요청을 잘 이해하고 응답했지만, 기능 목록을 더 구체적으로 제공하면 더 유용할 것이다."
+      },
+      "success": true,
+      "error": null
+    },
+    {
+      "scenario": {
+        "name": "모호한_그라파나_요청",
+        "description": "구체적이지 않은 Grafana 관련 요청",
+        "user_input": "그라파나 관련해서 뭔가 해주세요",
+        "expected_agent": "grafana_renderer_mcp_agent",
+        "category": "ambiguous"
+      },
+      "response": {
+        "content": "어떤 종류의 작업을 원하시나요? 제가 도와드릴 수 있는 몇 가지는 다음과 같습니다:\n\n1.  **대시보드 관련 작업**:\n    *   특정 대시보드의 이미지 렌더링\n    *   대시보드 목록 보기\n2.  **모니터링 및 분석 관련 작업**:\n    *   CPU, 메모리, 디스크 사용량과 같은 메트릭 분석\n    *   시스템 상태 확인\n    *   로그 모니터링\n\n어떤 작업을 원하시는지 구체적으로 말씀해 주시면, 해당 작업을 처리할 수 있는 에이전트에게 전달하여 결과를 알려드리겠습니다.",
+        "agent_used": "supervisor",
+        "tools_used": [],
+        "response_length": 278,
+        "execution_time": 1.6552554999943823
+      },
+      "evaluation": {
+        "agent_selection_score": 1,
+        "understanding_score": 4,
+        "completeness_score": 3,
+        "quality_score": 4,
+        "overall_score": 3,
+        "total_score": 15,
+        "max_score": 25,
+        "percentage": 60,
+        "success": false,
+        "strengths": [
+          "요청의 모호함을 인지하고 구체적인 질문을 유도함",
+          "Grafana 관련 가능한 작업들을 예시로 제시하여 사용자의 이해를 도움"
+        ],
+        "weaknesses": [
+          "supervisor 에이전트가 사용되어 전문 에이전트(grafana_renderer_mcp_agent)가 선택되지 않음",
+          "기본 동작 수행 없이 질문만 함"
+        ],
+        "recommendations": [
+          "모호한 요청에 대해 grafana_renderer_mcp_agent가 기본 동작(예: 가장 최근 대시보드 렌더링)을 수행하도록 변경",
+          "supervisor 에이전트가 아닌, grafana_renderer_mcp_agent가 직접 응답하도록 조정"
+        ],
+        "summary": "요청 이해도는 높으나, 에이전트 선택 실패 및 기본 동작 미수행으로 인해 기대에 미치지 못하는 응답을 제공함"
+      },
+      "success": false,
+      "error": null
+    },
+    {
+      "scenario": {
+        "name": "존재하지_않는_대시보드",
+        "description": "존재하지 않는 대시보드 요청",
+        "user_input": "NonExistent Dashboard를 렌더링해주세요",
+        "expected_agent": "grafana_renderer_mcp_agent",
+        "category": "error_handling"
+      },
+      "response": {
+        "content": "NonExistent Dashboard는 존재하지 않는 대시보드입니다. 현재 사용 가능한 대시보드 중에서 선택해 주시거나, 정확한 대시보드 이름을 알려주시면 렌더링해 드리겠습니다.",
+        "agent_used": "grafana_renderer_mcp_agent",
+        "tools_used": [
+          "transfer_to_grafana_renderer_mcp_agent",
+          "list_dashboards",
+          "transfer_back_to_supervisor"
+        ],
+        "response_length": 100,
+        "execution_time": 8.189525458961725
+      },
+      "evaluation": {
+        "agent_selection_score": 5,
+        "understanding_score": 5,
+        "completeness_score": 5,
+        "quality_score": 5,
+        "overall_score": 5,
+        "total_score": 25,
+        "max_score": 25,
+        "percentage": 100,
+        "success": true,
+        "strengths": [
+          "적절한 에이전트 선택",
+          "명확한 오류 메시지",
+          "대안 제시"
+        ],
+        "weaknesses": [],
+        "recommendations": [],
+        "summary": "존재하지 않는 대시보드 요청에 대해 적절한 에이전트가 선택되었고, 명확한 오류 메시지와 함께 대안을 제시하여 완벽하게 대응했습니다."
+      },
+      "success": true,
+      "error": null
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import base64
 
 from langchain_core.messages import HumanMessage, ToolMessage
 
-from .agents.enhanced_supervisor import get_enhanced_supervisor_graph
+from .agents.supervisor import get_supervisor_graph
 
 logger = logging.getLogger(__name__)
 
@@ -47,11 +47,11 @@ async def get_app_graph():
     global _app_graph
     if _app_graph is None:
         try:
-            logger.info("Enhanced LangGraph initialization started...")
-            _app_graph = await get_enhanced_supervisor_graph()
-            logger.info("Enhanced LangGraph initialization completed.")
+            logger.info("LangGraph initialization started...")
+            _app_graph = await get_supervisor_graph()
+            logger.info("LangGraph initialization completed.")
         except Exception as e:
-            logger.error(f"Failed to initialize Enhanced LangGraph: {str(e)}")
+            logger.error(f"Failed to initialize LangGraph: {str(e)}")
             raise
     return _app_graph
 

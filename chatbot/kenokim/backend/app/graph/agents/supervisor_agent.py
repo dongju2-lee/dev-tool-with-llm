@@ -8,7 +8,7 @@ Flow: 사용자 입력 → Supervisor (ReAct + Tools) → 전문 에이전트
 """
 
 import logging
-from typing import Annotated, Literal
+from typing import Annotated, Literal, List
 from langchain_core.messages import AIMessage, ToolMessage
 from langchain_core.tools import tool
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -19,8 +19,15 @@ from langchain_core.tools import InjectedToolCallId
 
 from .grafana_mcp_agent import make_grafana_agent
 from .grafana_renderer_mcp_agent import make_grafana_renderer_agent
-from ...core.config import settings
+
 from ..state import GraphState
+from ...prompts.prompts import (
+    SUPERVISOR_AGENT_PROMPT, 
+    QUERY_TRANSFORMATION_PROMPT_TEMPLATE,
+    HANDOFF_GRAFANA_AGENT_DESCRIPTION,
+    HANDOFF_GRAFANA_RENDERER_DESCRIPTION
+)
+from ...core.config import settings
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,7 +35,7 @@ logger = logging.getLogger(__name__)
 
 # LLM 초기화
 llm = ChatGoogleGenerativeAI(
-    model=settings.gemini_model,
+    model="gemini-2.0-flash",
     google_api_key=settings.gemini_api_key,
     temperature=0
 )
@@ -52,17 +59,9 @@ def transform_query(
     logger.info(f"Transforming query: {original_query}")
     
     # Query transformation을 위한 전용 프롬프트
-    transformation_prompt = f"""다음 사용자 쿼리를 Grafana 모니터링 시스템에서 처리하기 적합하도록 명확하고 구체적으로 변환해주세요.
-
-원본 쿼리: "{original_query}"
-
-변환 가이드라인:
-1. 모호한 표현을 구체적으로 명시
-2. Grafana 관련 용어 사용 (대시보드, 패널, 메트릭 등)
-3. 작업 의도를 명확하게 표현
-4. 한국어로 자연스럽게 작성
-
-변환된 쿼리만 반환하세요 (추가 설명 없이):"""
+    transformation_prompt = QUERY_TRANSFORMATION_PROMPT_TEMPLATE.format(
+        original_query=original_query
+    )
 
     try:
         # Query transformation 수행
@@ -102,6 +101,7 @@ def transform_query(
         state.update({"messages": current_messages + [error_message]})
         
         return original_query  # 오류 시 원본 쿼리 반환
+
 
 def create_handoff_tool(agent_name: str, description: str):
     """전문 에이전트로 작업을 위임하는 handoff tool 생성"""
@@ -144,51 +144,27 @@ def create_handoff_tool(agent_name: str, description: str):
 # Handoff tools 생성
 handoff_to_grafana_agent = create_handoff_tool(
     agent_name="grafana_agent",
-    description="Grafana 데이터 분석, 메트릭 조회, 대시보드 목록 확인이 필요할 때 사용합니다. CPU, 메모리, 성능 분석, 대시보드 정보 조회 등의 작업에 적합합니다."
+    description=HANDOFF_GRAFANA_AGENT_DESCRIPTION
 )
 
 handoff_to_grafana_renderer = create_handoff_tool(
     agent_name="grafana_renderer_mcp_agent", 
-    description="Grafana 대시보드를 시각화하고 이미지로 렌더링할 때 사용합니다. 대시보드를 보여주거나, 차트를 그리거나, 스크린샷을 생성하는 작업에 적합합니다."
+    description=HANDOFF_GRAFANA_RENDERER_DESCRIPTION
 )
 
 def create_supervisor_agent():
     """ReAct 패턴 기반 Supervisor 에이전트 생성"""
     
-    # Supervisor 시스템 프롬프트
-    supervisor_prompt = """당신은 Grafana 모니터링 시스템의 지능형 Supervisor입니다.
-
-주요 역할:
-1. 사용자 요청 분석 및 쿼리 최적화
-2. 적절한 전문 에이전트로 작업 위임
-3. 직접 응답이 가능한 간단한 질문 처리
-
-사용 가능한 도구:
-1. transform_query: 모호한 사용자 쿼리를 명확하고 구체적으로 변환
-2. handoff_to_grafana_agent: Grafana 데이터 분석 및 메트릭 조회 전문가
-3. handoff_to_grafana_renderer: Grafana 대시보드 시각화 및 렌더링 전문가
-
-작업 흐름 가이드라인:
-1. 사용자 요청이 모호하거나 불분명하면 먼저 transform_query 도구를 사용하여 쿼리를 명확하게 변환
-2. 변환된 쿼리(또는 이미 명확한 쿼리)를 바탕으로 적절한 전문가에게 작업 위임:
-   - 데이터 분석, 성능 확인, 대시보드 목록 조회 → handoff_to_grafana_agent
-   - 대시보드 시각화, 이미지 생성, 렌더링 → handoff_to_grafana_renderer
-3. 일반적인 인사나 간단한 질문은 직접 응답
-
-중요 사항:
-- 각 에이전트에게 작업을 위임할 때는 반드시 구체적이고 명확한 작업 설명을 제공
-- 사용자의 원래 요청과 컨텍스트를 모두 포함하여 에이전트가 완전히 이해할 수 있도록 함
-- 쿼리 변환이 필요한지 신중하게 판단하여 불필요한 변환은 피함"""
-
     # ReAct 에이전트 생성 (모든 tools 포함)
     supervisor_agent = create_react_agent(
         model=llm,
         tools=[transform_query, handoff_to_grafana_agent, handoff_to_grafana_renderer],
         state_schema=GraphState,
-        prompt=supervisor_prompt
+        prompt=SUPERVISOR_AGENT_PROMPT
     )
     
     return supervisor_agent
+
 
 def router(state: GraphState) -> Literal["grafana_agent", "grafana_renderer_mcp_agent", "END"]:
     """조건부 엣지 라우터 - Command 기반 라우팅"""
@@ -196,14 +172,15 @@ def router(state: GraphState) -> Literal["grafana_agent", "grafana_renderer_mcp_
     logger.info(f"Router directing to: {next_node}")
     return next_node
 
+
 async def create_supervisor_graph():
     """ReAct 기반 Supervisor 그래프 생성"""
     try:
         logger.info("Creating ReAct-based supervisor graph with query transformation")
         
         # 전문 에이전트 생성
-        grafana_agent = await make_grafana_agent(llm)
-        grafana_renderer_agent = await make_grafana_renderer_agent(llm)
+        grafana_agent = await make_grafana_agent()
+        grafana_renderer_agent = await make_grafana_renderer_agent()
         
         # Supervisor ReAct 에이전트 생성
         supervisor_agent = create_supervisor_agent()
@@ -242,6 +219,7 @@ async def create_supervisor_graph():
         logger.error(f"Error creating supervisor graph: {e}")
         raise
 
+
 # 싱글톤 패턴으로 그래프 관리
 _supervisor_graph = None
 
@@ -255,4 +233,27 @@ async def get_supervisor_graph():
     else:
         logger.debug("Returning cached supervisor graph")
     
-    return _supervisor_graph 
+    return _supervisor_graph
+
+
+# ============================================================================
+# 대화 히스토리 관리 함수들
+# ============================================================================
+
+# 메모리에 저장된 대화 히스토리 (간단한 in-memory 저장소)
+_conversation_store = {}
+
+def get_conversation_history(thread_id: str) -> List:
+    """특정 thread의 대화 히스토리를 가져옵니다."""
+    return _conversation_store.get(thread_id, [])
+
+def clear_conversation_history(thread_id: str) -> bool:
+    """특정 thread의 대화 히스토리를 삭제합니다."""
+    if thread_id in _conversation_store:
+        del _conversation_store[thread_id]
+        return True
+    return False
+
+def list_active_conversations() -> List[str]:
+    """활성 대화 목록을 반환합니다."""
+    return list(_conversation_store.keys()) 

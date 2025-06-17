@@ -232,7 +232,7 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
   // 메시지 내용에서 base64 이미지를 감지하고 렌더링하는 함수
   const renderMessageContent = (content: string) => {
-    // 마크다운 이미지 패턴 감지 (![alt](data:image/...))
+    // 1. 마크다운 이미지 패턴 감지 (![alt](data:image/...))
     const markdownImageRegex = /!\[([^\]]*)\]\((data:image\/[^;]+;base64,[A-Za-z0-9+/]+=*)\)/g;
     
     // 마크다운 이미지 먼저 확인
@@ -295,11 +295,68 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       return <div>{elements}</div>;
     }
 
-    // base64 이미지 패턴 감지 (백업)
-    const base64ImageRegex = /[A-Za-z0-9+/]{100,}={0,2}/g;
+    // 2. "[렌더링된 이미지 데이터]" 패턴 감지 - 새로 추가!
+    // 단순하게 텍스트에서 해당 패턴을 찾고 분리하는 방식
+    if (content.includes('[렌더링된 이미지 데이터]')) {
+      // "[렌더링된 이미지 데이터]" 텍스트를 기준으로 분리
+      const parts = content.split('[렌더링된 이미지 데이터]');
+      
+      if (parts.length >= 2) {
+        const beforeText = parts[0];
+        const afterPart = parts[1];
+        
+        // 두 번째 부분에서 base64 데이터 찾기
+        const base64Match = afterPart.match(/([A-Za-z0-9+/]{500,}={0,2})/);
+        
+        if (base64Match) {
+          const base64Data = base64Match[1];
+          const imageDataUrl = `data:image/png;base64,${base64Data}`;
+          
+          // base64 데이터 이후의 텍스트 추출
+          const afterImageText = afterPart.replace(base64Data, '').trim();
+          
+          return (
+            <div>
+              {/* 이미지 이전 텍스트 */}
+              {beforeText && (
+                <div>
+                  {beforeText.split('\n').map((line, lineIndex) => (
+                    <div key={lineIndex}>{line}</div>
+                  ))}
+                </div>
+              )}
+              
+              {/* 이미지 */}
+              <div className="image-container">
+                <img 
+                  src={imageDataUrl} 
+                  alt="Generated dashboard" 
+                  style={{ 
+                    maxWidth: '100%', 
+                    height: 'auto', 
+                    borderRadius: '8px', 
+                    margin: '10px 0',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
+                  }}
+                />
+              </div>
+              
+              {/* 이미지 이후 텍스트 */}
+              {afterImageText && (
+                <div>
+                  {afterImageText.split('\n').map((line, lineIndex) => (
+                    <div key={lineIndex}>{line}</div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }
+      }
+    }
+
+    // 3. data:image 형식 확인
     const dataImageRegex = /data:image\/[^;]+;base64,([A-Za-z0-9+/]+=*)/g;
-    
-    // data:image 형식 확인
     const dataImageMatches = content.match(dataImageRegex);
     if (dataImageMatches) {
       const parts = content.split(dataImageRegex);
@@ -323,33 +380,32 @@ const ChatInterface: React.FC<ChatInterfaceProps> = ({
       );
     }
     
-    // 단순 base64 문자열 확인 (매우 긴 문자열)
+    // 4. 단순 base64 문자열 확인 (매우 긴 문자열)
+    const base64ImageRegex = /[A-Za-z0-9+/]{1000,}={0,2}/g;
     const longBase64Matches = content.match(base64ImageRegex);
     if (longBase64Matches) {
       // 가장 긴 base64 문자열을 이미지로 가정
       const longestMatch = longBase64Matches.reduce((a, b) => a.length > b.length ? a : b);
       
-      if (longestMatch.length > 1000) { // 충분히 긴 경우만 이미지로 처리
-        const parts = content.split(longestMatch);
-        const imageDataUrl = `data:image/png;base64,${longestMatch}`;
-        
-        return (
-          <div>
-            <div>{parts[0]}</div>
-            <div className="image-container">
-              <img 
-                src={imageDataUrl} 
-                alt="Generated dashboard" 
-                style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', margin: '10px 0' }}
-              />
-            </div>
-            <div>{parts[1]}</div>
+      const parts = content.split(longestMatch);
+      const imageDataUrl = `data:image/png;base64,${longestMatch}`;
+      
+      return (
+        <div>
+          <div>{parts[0]}</div>
+          <div className="image-container">
+            <img 
+              src={imageDataUrl} 
+              alt="Generated dashboard" 
+              style={{ maxWidth: '100%', height: 'auto', borderRadius: '8px', margin: '10px 0' }}
+            />
           </div>
-        );
-      }
+          <div>{parts[1]}</div>
+        </div>
+      );
     }
     
-    // 일반 텍스트 처리 (줄바꿈 보존)
+    // 5. 일반 텍스트 처리 (줄바꿈 보존)
     return content.split('\n').map((line, index) => (
       <div key={index}>{line}</div>
     ));

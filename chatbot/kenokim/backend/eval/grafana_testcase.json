@@ -1,0 +1,72 @@
+[
+    {
+        "id": 1,
+        "question": "현재 서버의 CPU 사용률과 메모리 사용률을 확인해주세요",
+        "data_source": "prometheus",
+        "is_correct": true
+    },
+    {
+        "id": 2,
+        "question": "현재 서버의 CPU 사용률과 메모리 사용률을 볼 수 있는 대시보드를 보여주세요.",
+        "data_source": "grafana",
+        "is_correct": false
+    },
+    {
+        "id": 3,
+        "question": "최근 1시간 동안의 애플리케이션 에러 로그를 분석해주세요",
+        "data_source": "loki",
+        "is_correct": true
+    },
+    {
+        "id": 4,
+        "question": "최근 1시간 동안의 app=food-delivery 애플리케이션 로그를 분석해주세요",
+        "data_source": "loki",
+        "is_correct": true
+    },
+    {
+        "id": 5,
+        "question": "최근 1시간 동안의 애플리케이션 로그를 분석해주세요",
+        "data_source": "loki",
+        "is_correct": true
+    },
+    {
+        "id": 6,
+        "question": "loki 데이터소스 목록을 보여주세요",
+        "data_source": "loki"
+    },
+    {
+        "id": 7,
+        "question": "최근 6시간 동안의 네트워크 트래픽과 디스크 I/O 상태를 분석해주세요",
+        "data_source": "prometheus"
+    },
+    {
+        "id": 8,
+        "question": "현재 서버의 루트 파일시스템 사용률이 몇인가요?",
+        "data_source": "prometheus"
+    },
+    {
+        "id": 9,
+        "question": "서버 업타임을 확인하고, 재부팅이 필요한 상태인지 판단해주세요.",
+        "data_source": "prometheus"
+    },
+    {
+        "id": 10,
+        "question": "Memory Meminfo 패널들을 포함한 메모리 상세 분석 대시보드를 보여주세요",
+        "data_source": "grafana"
+    },
+    {
+        "id": 11,
+        "question": "CPU Busy 와 System Load 를 알려주시고 이 서버 성능 상태가 정상인가요?",
+        "data_source": "prometheus"
+    },
+    {
+        "id": 12,
+        "question": "eth0과 lo 네트워크 인터페이스의 송수신 트래픽을 비교 분석해주세요",
+        "data_source": "prometheus"
+    },
+    {
+        "id": 14,
+        "question": "app=food-delivery 애플리케이션 로그에서 '500' 키워드가 포함된 로그를 검색해주세요",
+        "data_source": "loki"
+    }
+]

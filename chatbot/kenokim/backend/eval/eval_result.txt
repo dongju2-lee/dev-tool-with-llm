@@ -1,0 +1,76 @@
+안녕하세요! LangGraph 전문 AI 어시스턴트입니다. 다음과 같은 업무를 도와드릴 수 있습니다:
+📊 그래프 워크플로우 설계 및 분석
+📈 에이전트 시스템 구축 및 최적화
+🖼️ 복잡한 AI 파이프라인 시각화
+⚙️ 상태 관리 및 멀티 에이전트 관리
+무엇을 도와드릴까요?
+오후 3:35:46
+현재 서버의 CPU 사용률과 메모리 사용률을 확인해주세요
+오후 3:35:47
+서버의 CPU 사용률과 메모리 사용률입니다 (최근 1시간):
+📊 **CPU 사용률**: 6.73% (정상)
+📊 **메모리 사용률**: 45.92% (정상)
+✅ **상태 평가**: 정상
+🔍 **권장사항**: 현재 모든 지표가 정상 범위 내에 있습니다.
+지난 24시간 또는 다른 시간 범위의 데이터가 필요하시면 말씀해 주세요.
+오후 3:36:02
+최근 1시간 동안의 애플리케이션 로그를 분석해주세요
+오후 3:36:11
+로그 분석 요청 시 앱 이름을 지정해서 요청해 주세요. 앱 목록: ['food-delivery']
+오후 3:36:16
+최근 1시간 동안의 food-delivery 애플리케이션 로그를 분석해주세요
+오후 3:36:27
+현재 'food-delivery' 앱에 대한 로그가 있습니다. 어떤 특정 앱에 대한 로그 분석을 원하시나요? 앱 목록: ['food-delivery']
+오후 3:36:33
+최근 1시간 동안의 app=food-delivery 애플리케이션 로그를 분석해주세요
+오후 3:36:50
+최근 1시간 동안의 `app=food-delivery` 애플리케이션 로그 분석 결과입니다.
+**최근 로그 예시 (3개):**
+1.  `{"timestamp": "2025-06-17T06:36:47.161721", "service": "user-service", "level": "INFO", "message": "Request completed: GET /metrics - 200", "request_id": "b2834ccc-fb6e-4cb7-a5ac-443403a24d84", "method": "GET", "path": "/metrics", "status_code": 200, "process_time_ms": 6.21}`
+2.  `{"timestamp": "2025-06-17T06:36:47.377354", "service": "restaurant-service", "level": "INFO", "message": "Request completed: GET /metrics - 200", "request_id": "c39c6bf9-ab5b-440e-994e-f9747d02d4ff", "method": "GET", "path": "/metrics", "status_code": 200, "process_time_ms": 6.15}`
+3.  `{"timestamp": "2025-06-17T06:36:47.371266", "service": "restaurant-service", "level": "INFO", "message": "Request started: GET /metrics", "request_id": "c39c6bf9-ab5b-440e-994e-f9747d02d4ff", "method": "GET", "path": "/metrics", "query_params": {}, "client_host": "172.18.0.3", "headers": {"host": "restaurant-service:8000", "user-agent": "Prometheus/3.4.0", "accept": "application/openmetrics-text;version=1.0.0;escaping=allow-utf-8;q=0.6,application/openmetrics-text;version=0.0.1;q=0.5,text/plain;version=1.0.0;escaping=allow-utf-8;q=0.4,text/plain;version=0.0.4;q=0.3,*/*;q=0.2", "accept-encoding": "gzip", "x-prometheus-scrape-timeout-seconds": "10"}}`
+현재 INFO 레벨의 로그가 주로 확인되고 있습니다. 특정 에러 로그나 다른 레벨의 로그를 확인하시려면, 추가적인 키워드를 지정하여 요청해주세요. 예를 들어, `app=food-delivery AND level=ERROR` 와 같이 쿼리를 변경할 수 있습니다.
+오후 3:36:57
+loki 데이터소스 목록을 보여주세요
+오후 3:37:06
+Loki 데이터소스 목록입니다.
+| ID | Name | Type | UID             |
+|----|------|------|-----------------|
+| 2  | Loki | loki | P8E80F9AEF21F6940 |
+오후 3:37:09
+최근 6시간 동안의 네트워크 트래픽과 디스크 I/O 상태를 분석해주세요
+오후 3:37:20
+Prometheus 데이터 소스를 찾을 수 없습니다. 사용 가능한 데이터 소스 목록을 확인하려면 `list_datasources` 도구를 사용하십시오. 데이터 소스 이름을 확인한 후 다시 시도하십시오.
+오후 3:37:28
+최근 6시간 동안의 네트워크 트래픽과 디스크 I/O 상태를 분석해주세요
+오후 3:37:35
+최근 6시간 동안의 네트워크 트래픽과 디스크 I/O 상태 분석 결과입니다.
+**네트워크 트래픽 (eth0):**
+*   **수신 트래픽:** 0 ~ 63.29 bytes/sec
+*   **송신 트래픽:** 995.57 ~ 1018.99 bytes/sec
+**디스크 I/O (sda):**
+*   **디스크 읽기:** 0 ~ 156970 bytes/sec
+*   **디스크 쓰기:** 48318 ~ 179850 bytes/sec
+전반적으로 네트워크 송신 트래픽은 비교적 안정적인 반면, 수신 트래픽은 변동이 있습니다. 디스크 I/O는 읽기 및 쓰기 모두에서 상당한 변동성을 보입니다. 특정 시간대에 I/O 활동이 급증하는 것을 확인할 수 있습니다.
+더 자세한 분석을 위해 특정 시간대의 I/O 활동이 급증한 원인을 조사하거나, 특정 애플리케이션의 네트워크 사용량을 분석하는 것을 추천합니다.
+오후 3:37:55
+CPU Busy 와 System Load 를 알려주시고 이 서버 성능 상태가 정상인가요?
+오후 3:38:08
+최근 1시간 동안의 CPU 사용률과 시스템 로드 정보입니다.
+📊 **CPU 사용률**: 7.17% (최근 5분 평균)
+📊 **시스템 로드 (1분)**: 0.72
+✅ **상태 평가**: CPU 사용률이 낮고 시스템 로드도 적정 수준이므로 전반적으로 양호한 상태입니다.
+더 자세한 분석이나 다른 시간대의 데이터가 필요하시면 말씀해주세요.
+오후 3:38:31
+애플리케이션 로그에서 '500' 키워드가 포함된 로그를 검색해주세요
+오후 3:38:48
+로그 분석 요청 시 앱 이름을 지정해서 요청해 주세요. 앱 목록: ['food-delivery']
+오후 3:38:53
+애플리케이션 로그에서 '500' 키워드가 포함된 로그를 검색해주세요 app=food-delivery 입니다.
+오후 3:39:07
+애플리케이션 food-delivery에서 '500' 키워드가 포함된 로그를 검색한 결과입니다.
+**최근 로그 3개:**
+1.  `{"timestamp": "2025-06-17T06:30:09.067289", "service": "order-service", "level": "INFO", "message": "Request completed: GET /metrics - 200", "request_id": "841ccc88-02a2-4044-93e4-6c500745ee86", "method": "GET", "path": "/metrics", "status_code": 200, "process_time_ms": 16.59}`
+2.  `{"timestamp": "2025-06-17T06:30:09.050727", "service": "order-service", "level": "INFO", "message": "Request started: GET /metrics", "request_id": "841ccc88-02a2-4044-93e4-6c500745ee86", "method": "GET", "path": "/metrics", "query_params": {}, "client_host": "172.18.0.3", "headers": {"host": "order-service:8000", "user-agent": "Prometheus/3.4.0", "accept": "application/openmetrics-text;version=1.0.0;escaping=allow-utf-8;q=0.6,application/openmetrics-text;version=0.0.1;q=0.5,text/plain;version=1.0.0;escaping=allow-utf-8;q=0.4,text/plain;version=0.0.4;q=0.3,*/*;q=0.2", "accept-encoding": "gzip", "x-prometheus-scrape-timeout-seconds": "10"}}`
+3.  `{"timestamp": "2025-06-17T06:29:39.050087", "service": "order-service", "level": "INFO", "message": "Request started: GET /metrics", "request_id": "1a40cffc-21f0-4f53-ab6c-46cfb491276c", "method": "GET", "path": "/metrics", "query_params": {}, "client_host": "172.18.0.3", "headers": {"host": "order-service:8000", "user-agent": "Prometheus/3.4.0", "accept": "application/openmetrics-text;version=1.0.0;escaping=allow-utf-8;q=0.6,application/openmetrics-text;version=0.0.1;q=0.5,text/plain;version=1.0.0;escaping=allow-utf-8;q=0.4,text/plain;version=0.0.4;q=0.3,*/*;q=0.2", "accept-encoding": "gzip", "x-prometheus-scrape-timeout-seconds": "10"}}`
+현재 '500' 에러가 발생한 것으로 보이는 로그는 없습니다. 더 자세한 분석을 위해 시간 범위를 늘리거나, 다른 키워드를 검색해 보시겠습니까?
